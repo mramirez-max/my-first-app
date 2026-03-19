@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import React from 'react'
 import { Profile, Area, Role, CompanyObjective } from '@/types'
 import {
   Table,
@@ -25,6 +26,7 @@ import SeedCompanyOKRsButton from './SeedCompanyOKRsButton'
 import BulkImportModal from '@/components/admin/BulkImportModal'
 import InviteUserModal from '@/components/admin/InviteUserModal'
 import InsightsPanel, { ComputedInsight, AreaInsightData } from '@/components/admin/InsightsPanel'
+import OKRManager from '@/components/admin/OKRManager'
 import { Upload, UserPlus } from 'lucide-react'
 
 interface AdminClientProps {
@@ -35,6 +37,7 @@ interface AdminClientProps {
   year: number
   insights: ComputedInsight[]
   areaData: AreaInsightData[]
+  initialObjectives: React.ComponentProps<typeof OKRManager>['initialObjectives']
 }
 
 const ROLE_LABELS: Record<Role, string> = {
@@ -49,7 +52,7 @@ const ROLE_BADGE: Record<Role, 'default' | 'secondary' | 'outline'> = {
   team_member: 'outline',
 }
 
-export default function AdminClient({ profiles, areas, companyObjectives, quarter, year, insights, areaData }: AdminClientProps) {
+export default function AdminClient({ profiles, areas, companyObjectives, quarter, year, insights, areaData, initialObjectives }: AdminClientProps) {
   const supabase = createClient()
   const router = useRouter()
   const [saving, setSaving] = useState<string | null>(null)
@@ -207,6 +210,15 @@ export default function AdminClient({ profiles, areas, companyObjectives, quarte
         quarter={quarter}
         year={year}
         onSuccess={() => router.refresh()}
+      />
+
+      <OKRManager
+        initialObjectives={initialObjectives}
+        areas={areas}
+        companyObjectives={companyObjectives}
+        profiles={profiles}
+        quarter={quarter}
+        year={year}
       />
 
       <InsightsPanel insights={insights} areaData={areaData} quarter={quarter} year={year} areas={areas} />

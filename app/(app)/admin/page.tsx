@@ -40,7 +40,7 @@ export default async function AdminPage() {
     admin.auth.admin.listUsers(),
     supabase
       .from('area_objectives')
-      .select('id, title, area_id, area:areas(name), key_results:area_key_results(id, description, updates:area_kr_updates(confidence_score, update_text, created_at))')
+      .select('id, title, area_id, aligned_to, area:areas(name), key_results:area_key_results(id, description, target_value, unit, owner_id, updates:area_kr_updates(confidence_score, update_text, created_at))')
       .eq('quarter', quarter)
       .eq('year', year),
   ])
@@ -115,6 +115,26 @@ export default async function AdminPage() {
     recentUpdates: d.recentUpdates,
   }))
 
+  // Shape area objectives for OKRManager (flat list with full KR fields)
+  type RawKR = { id: string; description: string; target_value: number; unit: string | null; owner_id: string | null }
+  type RawObj = { id: string; area_id: string; title: string; aligned_to: string | null; key_results: unknown }
+  const initialObjectives = (areaObjectives ?? []).map((o) => {
+    const raw = o as unknown as RawObj
+    return {
+      id: raw.id,
+      area_id: raw.area_id,
+      title: raw.title,
+      aligned_to: raw.aligned_to,
+      key_results: ((raw.key_results as RawKR[]) ?? []).map(kr => ({
+        id: kr.id,
+        description: kr.description,
+        target_value: kr.target_value,
+        unit: kr.unit,
+        owner_id: kr.owner_id,
+      })),
+    }
+  })
+
   return (
     <div className="p-8 max-w-5xl mx-auto space-y-8">
       <div>
@@ -129,6 +149,7 @@ export default async function AdminPage() {
         year={year}
         insights={insights}
         areaData={areaData}
+        initialObjectives={initialObjectives}
       />
     </div>
   )
