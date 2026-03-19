@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { AreaKRUpdate, CompanyKRUpdate } from '@/types'
-import { Pencil } from 'lucide-react'
+import { Pencil, Trash2 } from 'lucide-react'
 import WeeklyUpdateForm from './WeeklyUpdateForm'
 
 interface UpdateFeedProps {
@@ -28,6 +28,12 @@ export default function UpdateFeed({ keyResultId, type, refreshKey, canEdit, cur
   const [loading, setLoading] = useState(true)
   const [editingUpdate, setEditingUpdate] = useState<AreaKRUpdate | CompanyKRUpdate | null>(null)
   const [internalRefresh, setInternalRefresh] = useState(0)
+
+  async function handleDelete(update: AreaKRUpdate | CompanyKRUpdate) {
+    if (!confirm('Delete this update? This cannot be undone.')) return
+    await supabase.from(table).delete().eq('id', update.id)
+    setInternalRefresh(k => k + 1)
+  }
 
   const table = type === 'area' ? 'area_kr_updates' : 'company_kr_updates'
 
@@ -74,13 +80,22 @@ export default function UpdateFeed({ keyResultId, type, refreshKey, canEdit, cur
                     {conf.label} ({update.confidence_score}/5)
                   </span>
                   {canEdit && (
-                    <button
-                      onClick={() => setEditingUpdate(update)}
-                      className="text-white/25 hover:text-white/70 transition-colors p-0.5"
-                      title="Edit update"
-                    >
-                      <Pencil size={11} />
-                    </button>
+                    <>
+                      <button
+                        onClick={() => setEditingUpdate(update)}
+                        className="text-white/25 hover:text-white/70 transition-colors p-0.5"
+                        title="Edit update"
+                      >
+                        <Pencil size={11} />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(update)}
+                        className="text-white/25 hover:text-red-400 transition-colors p-0.5"
+                        title="Delete update"
+                      >
+                        <Trash2 size={11} />
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
