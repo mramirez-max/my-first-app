@@ -32,10 +32,12 @@ export default function ExecutiveClient({
   const [questions, setQuestions] = useState<AreaQuestion[]>([])
   const [generating, setGenerating] = useState(false)
   const [generated, setGenerated] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [expandedAreas, setExpandedAreas] = useState<Set<string>>(new Set())
 
   async function generateQuestions() {
     setGenerating(true)
+    setError(null)
     try {
       const res = await fetch('/api/ai-questions', {
         method: 'POST',
@@ -43,13 +45,22 @@ export default function ExecutiveClient({
         body: JSON.stringify({ areas: areasPayload }),
       })
       const data = await res.json()
+      if (!res.ok) {
+        setError(data.error ?? `Request failed (${res.status})`)
+        return
+      }
       const qs: AreaQuestion[] = data.questions ?? []
+      if (qs.length === 0) {
+        setError('No questions were returned. The area OKRs may be empty.')
+        return
+      }
       setQuestions(qs)
-      // Auto-expand all areas on first generation
       setExpandedAreas(new Set(qs.map((q: AreaQuestion) => q.area)))
+      setGenerated(true)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error')
     } finally {
       setGenerating(false)
-      setGenerated(true)
     }
   }
 
@@ -99,6 +110,12 @@ export default function ExecutiveClient({
             {generating ? 'Generating…' : generated ? 'Regenerate' : 'Generate questions'}
           </Button>
         </div>
+
+        {error && (
+          <div className="rounded-lg border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm text-red-400">
+            <span className="font-medium">Generation failed:</span> {error}
+          </div>
+        )}
 
         {areasWithData.length === 0 && (
           <p className="text-sm text-white/40 italic py-2">

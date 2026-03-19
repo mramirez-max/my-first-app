@@ -46,16 +46,27 @@ Return ONLY valid JSON in this exact format:
   ...
 ]`
 
-  const response = await client.messages.create({
-    model: 'claude-opus-4-6',
-    max_tokens: 2048,
-    thinking: { type: 'adaptive' },
-    messages: [{ role: 'user', content: prompt }],
-  })
+  try {
+    const response = await client.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 4096,
+      messages: [{ role: 'user', content: prompt }],
+    })
 
-  const text = response.content.find(b => b.type === 'text')?.text ?? '[]'
-  const jsonMatch = text.match(/\[[\s\S]*\]/)
-  const questions = jsonMatch ? JSON.parse(jsonMatch[0]) : []
+    const text = response.content.find(b => b.type === 'text')?.text ?? ''
+    if (!text) {
+      return NextResponse.json({ error: 'No text in Claude response', questions: [] }, { status: 500 })
+    }
 
-  return NextResponse.json({ questions })
+    const jsonMatch = text.match(/\[[\s\S]*\]/)
+    if (!jsonMatch) {
+      return NextResponse.json({ error: 'Could not parse JSON from response', raw: text.slice(0, 300), questions: [] }, { status: 500 })
+    }
+
+    const questions = JSON.parse(jsonMatch[0])
+    return NextResponse.json({ questions })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    return NextResponse.json({ error: message, questions: [] }, { status: 500 })
+  }
 }
