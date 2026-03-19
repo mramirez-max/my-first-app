@@ -53,7 +53,10 @@ export default function OKRManager({
 }: OKRManagerProps) {
   const supabase = createClient()
   const [objectives, setObjectives] = useState<Objective[]>(initialObjectives)
-  const [collapsedAreas, setCollapsedAreas] = useState<Set<string>>(new Set())
+  const [selectedAreaId, setSelectedAreaId] = useState<string>(
+    areas.find(a => initialObjectives.some(o => o.area_id === a.id))?.id ?? areas[0]?.id ?? ''
+  )
+  const [expandedKRs, setExpandedKRs] = useState<Set<string>>(new Set())
   const [savingId, setSavingId] = useState<string | null>(null)
   const [savedId, setSavedId] = useState<string | null>(null)
 
@@ -100,6 +103,7 @@ export default function OKRManager({
       setObjectives(prev => prev.map(o =>
         o.id !== objective.id ? o : { ...o, key_results: [...o.key_results, data as KR] }
       ))
+      setExpandedKRs(prev => new Set([...prev, objective.id]))
     }
   }
 
@@ -116,224 +120,225 @@ export default function OKRManager({
     await saveObjectiveField(objId, { area_id: newAreaId })
   }
 
-  function toggleArea(areaId: string) {
-    setCollapsedAreas(prev => {
+  function toggleKRs(objId: string) {
+    setExpandedKRs(prev => {
       const next = new Set(prev)
-      next.has(areaId) ? next.delete(areaId) : next.add(areaId)
+      next.has(objId) ? next.delete(objId) : next.add(objId)
       return next
     })
   }
 
-  const byArea = areas
-    .map(area => ({ area, objs: objectives.filter(o => o.area_id === area.id) }))
-    .filter(g => g.objs.length > 0)
-
-  const totalObjs = objectives.length
-  const totalKRs = objectives.reduce((s, o) => s + o.key_results.length, 0)
+  const areasWithOKRs = areas.filter(a => objectives.some(o => o.area_id === a.id))
+  const visibleObjectives = objectives.filter(o => o.area_id === selectedAreaId)
 
   return (
     <section className="rounded-xl border border-white/8 bg-gradient-to-br from-[#1c1540] to-[#23174B] p-5 space-y-4">
       <div>
         <h2 className="text-base font-semibold text-white">Manage OKRs — Q{quarter} {year}</h2>
-        <p className="text-sm text-white/40 mt-0.5">
-          {totalObjs} objectives · {totalKRs} key results — edit inline, changes save automatically
-        </p>
+        <p className="text-sm text-white/40 mt-0.5">Select an area to view and edit its objectives</p>
       </div>
 
-      {totalObjs === 0 ? (
-        <p className="text-sm text-white/40 italic py-2">
-          No OKRs for this quarter yet. Use Bulk Import above to get started.
-        </p>
+      {/* Area filter */}
+      <div className="flex flex-wrap gap-2">
+        {areasWithOKRs.map(a => {
+          const count = objectives.filter(o => o.area_id === a.id).length
+          return (
+            <button
+              key={a.id}
+              onClick={() => setSelectedAreaId(a.id)}
+              className={cn(
+                'px-3 py-1 rounded-full text-xs font-medium border transition-colors',
+                selectedAreaId === a.id
+                  ? 'bg-white/15 border-white/20 text-white'
+                  : 'bg-white/5 border-white/10 text-white/50 hover:text-white/80'
+              )}
+            >
+              {a.name} ({count})
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Objectives list */}
+      {visibleObjectives.length === 0 ? (
+        <p className="text-sm text-white/40 italic py-1">No objectives for this area yet.</p>
       ) : (
         <div className="space-y-2">
-          {byArea.map(({ area, objs }) => {
-            const collapsed = collapsedAreas.has(area.id)
+          {visibleObjectives.map((obj, objIdx) => {
+            const coIdx = companyObjectives.findIndex(co => co.id === obj.aligned_to)
+            const krsExpanded = expandedKRs.has(obj.id)
+            const isSaving = savingId === obj.id
+            const isSaved = savedId === obj.id
+
             return (
-              <div key={area.id} className="rounded-xl border border-white/10 overflow-hidden">
-                {/* Area header */}
-                <button
-                  onClick={() => toggleArea(area.id)}
-                  className="w-full flex items-center justify-between px-4 py-3 bg-white/2 hover:bg-white/4 transition-colors text-left"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
-                    <span className="text-sm font-semibold text-white">{area.name}</span>
-                    <span className="text-xs text-white/30">
-                      {objs.length} obj · {objs.reduce((s, o) => s + o.key_results.length, 0)} KRs
-                    </span>
+              <div key={obj.id} className="rounded-lg border border-white/8 bg-white/2 overflow-hidden">
+                {/* Objective row */}
+                <div className="px-4 py-3 space-y-2">
+                  {/* Status + label */}
+                  <div className="flex items-center gap-2 text-xs text-white/25 font-semibold uppercase tracking-wider">
+                    <span>Objective {objIdx + 1}</span>
+                    {isSaving && <Loader2 size={11} className="animate-spin text-white/30" />}
+                    {isSaved && !isSaving && (
+                      <span className="flex items-center gap-0.5 text-emerald-400 font-normal normal-case tracking-normal">
+                        <Check size={11} /> Saved
+                      </span>
+                    )}
                   </div>
-                  {collapsed
-                    ? <ChevronDown size={14} className="text-white/40 shrink-0" />
-                    : <ChevronUp size={14} className="text-white/40 shrink-0" />}
+
+                  {/* Title */}
+                  <Textarea
+                    value={obj.title}
+                    rows={2}
+                    onChange={e => patchObjective(obj.id, { title: e.target.value })}
+                    onBlur={e => saveObjectiveField(obj.id, { title: e.target.value })}
+                    className="text-sm resize-none bg-white/5 border-white/10 text-white focus:border-[#FF5A70]/50"
+                    placeholder="Objective title..."
+                  />
+
+                  {/* Controls */}
+                  <div className="flex flex-wrap gap-2 items-center">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-white/40 shrink-0">Area:</span>
+                      <Select value={obj.area_id} onValueChange={val => reassignArea(obj.id, val)}>
+                        <SelectTrigger className="h-7 text-xs bg-white/5 border-white/10 text-white w-36">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {areas.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <span className="text-white/15 text-xs">·</span>
+
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-white/40 shrink-0">Aligned to:</span>
+                      <Select
+                        value={obj.aligned_to ?? 'none'}
+                        onValueChange={val => {
+                          const v = val === 'none' ? null : val
+                          patchObjective(obj.id, { aligned_to: v })
+                          saveObjectiveField(obj.id, { aligned_to: v })
+                        }}
+                      >
+                        <SelectTrigger className="h-7 text-xs bg-white/5 border-white/10 text-white w-44">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Not aligned</SelectItem>
+                          {companyObjectives.map((co, i) => (
+                            <SelectItem key={co.id} value={co.id}>
+                              CO{i + 1}: {co.title.slice(0, 38)}{co.title.length > 38 ? '…' : ''}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {coIdx >= 0 && (
+                        <span className={cn('text-xs px-1.5 py-0.5 rounded border font-bold shrink-0', ALIGNMENT_COLORS[coIdx])}>
+                          CO{coIdx + 1}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* KRs toggle */}
+                <button
+                  onClick={() => toggleKRs(obj.id)}
+                  className="w-full flex items-center justify-between px-4 py-2 border-t border-white/6 text-xs text-white/40 hover:text-white/70 hover:bg-white/3 transition-colors"
+                >
+                  <span>{obj.key_results.length} key result{obj.key_results.length !== 1 ? 's' : ''}</span>
+                  {krsExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                 </button>
 
-                {/* Objectives */}
-                {!collapsed && (
-                  <div className="divide-y divide-white/6">
-                    {objs.map((obj, objIdx) => {
-                      const coIdx = companyObjectives.findIndex(co => co.id === obj.aligned_to)
-                      const isSaving = savingId === obj.id
-                      const isSaved = savedId === obj.id
-
+                {/* KRs */}
+                {krsExpanded && (
+                  <div className="px-4 pb-4 pt-2 space-y-2 border-t border-white/6">
+                    {obj.key_results.map((kr, krIdx) => {
+                      const krSaving = savingId === kr.id
+                      const krSaved = savedId === kr.id
                       return (
-                        <div key={obj.id} className="px-4 py-4 space-y-3">
-                          {/* Objective header */}
-                          <div className="flex items-center gap-2 text-xs font-bold text-white/25 uppercase tracking-wider">
-                            <span>Objective {objIdx + 1}</span>
-                            {isSaving && <Loader2 size={11} className="animate-spin text-white/30" />}
-                            {isSaved && !isSaving && <span className="flex items-center gap-0.5 text-emerald-400 font-normal normal-case tracking-normal"><Check size={11} /> Saved</span>}
+                        <div key={kr.id} className="p-3 rounded-lg bg-white/3 border border-white/6 space-y-2">
+                          <div className="flex items-center gap-1.5 text-xs text-white/25 font-semibold">
+                            <span>KR {krIdx + 1}</span>
+                            {krSaving && <Loader2 size={10} className="animate-spin text-white/30" />}
+                            {krSaved && !krSaving && (
+                              <span className="flex items-center gap-0.5 text-emerald-400 font-normal">
+                                <Check size={10} /> Saved
+                              </span>
+                            )}
+                            <button
+                              onClick={() => deleteKR(obj.id, kr.id)}
+                              className="ml-auto text-white/15 hover:text-red-400 transition-colors"
+                            >
+                              <Trash2 size={11} />
+                            </button>
                           </div>
 
-                          {/* Title */}
                           <Textarea
-                            value={obj.title}
+                            value={kr.description}
                             rows={2}
-                            onChange={e => patchObjective(obj.id, { title: e.target.value })}
-                            onBlur={e => saveObjectiveField(obj.id, { title: e.target.value })}
-                            className="text-sm resize-none bg-white/5 border-white/10 text-white focus:border-[#FF5A70]/50"
-                            placeholder="Objective title..."
+                            onChange={e => patchKR(obj.id, kr.id, { description: e.target.value })}
+                            onBlur={e => saveKRField(kr.id, { description: e.target.value })}
+                            className="text-xs resize-none bg-white/5 border-white/8 text-white focus:border-[#FF5A70]/50"
+                            placeholder="Key result description..."
                           />
 
-                          {/* Controls row */}
-                          <div className="flex flex-wrap gap-2 items-center">
-                            {/* Move to area */}
-                            <div className="flex items-center gap-1.5 min-w-0">
-                              <span className="text-xs text-white/40 shrink-0">Area:</span>
-                              <Select
-                                value={obj.area_id}
-                                onValueChange={val => reassignArea(obj.id, val)}
-                              >
-                                <SelectTrigger className="h-7 text-xs bg-white/5 border-white/10 text-white w-36">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {areas.map(a => (
-                                    <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
+                          <div className="flex gap-2 flex-wrap">
+                            <div className="flex-1 min-w-[90px]">
+                              <label className="text-xs text-white/30 mb-1 block">Target</label>
+                              <Input
+                                type="number"
+                                value={kr.target_value}
+                                onChange={e => patchKR(obj.id, kr.id, { target_value: parseFloat(e.target.value) || 0 })}
+                                onBlur={e => saveKRField(kr.id, { target_value: parseFloat(e.target.value) || 0 })}
+                                className="h-7 text-xs bg-white/5 border-white/8 text-white focus:border-[#FF5A70]/50"
+                              />
                             </div>
-
-                            <span className="text-white/15 text-xs">·</span>
-
-                            {/* Aligned to */}
-                            <div className="flex items-center gap-1.5 min-w-0">
-                              <span className="text-xs text-white/40 shrink-0">Aligned to:</span>
+                            <div className="w-24">
+                              <label className="text-xs text-white/30 mb-1 block">Unit</label>
+                              <Input
+                                value={kr.unit ?? ''}
+                                onChange={e => patchKR(obj.id, kr.id, { unit: e.target.value || null })}
+                                onBlur={e => saveKRField(kr.id, { unit: e.target.value || null })}
+                                className="h-7 text-xs bg-white/5 border-white/8 text-white focus:border-[#FF5A70]/50"
+                                placeholder="%, $, …"
+                              />
+                            </div>
+                            <div className="flex-1 min-w-[120px]">
+                              <label className="text-xs text-white/30 mb-1 block">Owner</label>
                               <Select
-                                value={obj.aligned_to ?? 'none'}
+                                value={kr.owner_id ?? 'none'}
                                 onValueChange={val => {
                                   const v = val === 'none' ? null : val
-                                  patchObjective(obj.id, { aligned_to: v })
-                                  saveObjectiveField(obj.id, { aligned_to: v })
+                                  patchKR(obj.id, kr.id, { owner_id: v })
+                                  saveKRField(kr.id, { owner_id: v })
                                 }}
                               >
-                                <SelectTrigger className="h-7 text-xs bg-white/5 border-white/10 text-white w-48">
-                                  <SelectValue />
+                                <SelectTrigger className="h-7 text-xs bg-white/5 border-white/8 text-white">
+                                  <SelectValue placeholder="Unassigned" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="none">Not aligned</SelectItem>
-                                  {companyObjectives.map((co, i) => (
-                                    <SelectItem key={co.id} value={co.id}>
-                                      CO{i + 1}: {co.title.slice(0, 40)}{co.title.length > 40 ? '…' : ''}
+                                  <SelectItem value="none">Unassigned</SelectItem>
+                                  {profiles.map(p => (
+                                    <SelectItem key={p.id} value={p.id}>
+                                      {p.full_name ?? p.email ?? p.id.slice(0, 8)}
                                     </SelectItem>
                                   ))}
                                 </SelectContent>
                               </Select>
-                              {coIdx >= 0 && (
-                                <span className={cn('text-xs px-1.5 py-0.5 rounded border font-bold shrink-0', ALIGNMENT_COLORS[coIdx])}>
-                                  CO{coIdx + 1}
-                                </span>
-                              )}
                             </div>
-                          </div>
-
-                          {/* Key Results */}
-                          <div className="space-y-2 pl-3 border-l border-white/8 mt-1">
-                            {obj.key_results.map((kr, krIdx) => {
-                              const krSaving = savingId === kr.id
-                              const krSaved = savedId === kr.id
-                              return (
-                                <div key={kr.id} className="p-3 rounded-lg bg-white/3 border border-white/6 space-y-2">
-                                  <div className="flex items-center gap-1.5 text-xs text-white/25 font-semibold">
-                                    <span>KR {krIdx + 1}</span>
-                                    {krSaving && <Loader2 size={10} className="animate-spin text-white/30" />}
-                                    {krSaved && !krSaving && <span className="flex items-center gap-0.5 text-emerald-400 font-normal"><Check size={10} /> Saved</span>}
-                                    <button
-                                      onClick={() => deleteKR(obj.id, kr.id)}
-                                      className="ml-auto text-white/15 hover:text-red-400 transition-colors"
-                                    >
-                                      <Trash2 size={11} />
-                                    </button>
-                                  </div>
-
-                                  <Textarea
-                                    value={kr.description}
-                                    rows={2}
-                                    onChange={e => patchKR(obj.id, kr.id, { description: e.target.value })}
-                                    onBlur={e => saveKRField(kr.id, { description: e.target.value })}
-                                    className="text-xs resize-none bg-white/5 border-white/8 text-white focus:border-[#FF5A70]/50"
-                                    placeholder="Key result description..."
-                                  />
-
-                                  <div className="flex gap-2 flex-wrap">
-                                    <div className="flex-1 min-w-[90px]">
-                                      <label className="text-xs text-white/30 mb-1 block">Target</label>
-                                      <Input
-                                        type="number"
-                                        value={kr.target_value}
-                                        onChange={e => patchKR(obj.id, kr.id, { target_value: parseFloat(e.target.value) || 0 })}
-                                        onBlur={e => saveKRField(kr.id, { target_value: parseFloat(e.target.value) || 0 })}
-                                        className="h-7 text-xs bg-white/5 border-white/8 text-white focus:border-[#FF5A70]/50"
-                                      />
-                                    </div>
-                                    <div className="w-24">
-                                      <label className="text-xs text-white/30 mb-1 block">Unit</label>
-                                      <Input
-                                        value={kr.unit ?? ''}
-                                        onChange={e => patchKR(obj.id, kr.id, { unit: e.target.value || null })}
-                                        onBlur={e => saveKRField(kr.id, { unit: e.target.value || null })}
-                                        className="h-7 text-xs bg-white/5 border-white/8 text-white focus:border-[#FF5A70]/50"
-                                        placeholder="%, $, …"
-                                      />
-                                    </div>
-                                    <div className="flex-1 min-w-[120px]">
-                                      <label className="text-xs text-white/30 mb-1 block">Owner</label>
-                                      <Select
-                                        value={kr.owner_id ?? 'none'}
-                                        onValueChange={val => {
-                                          const v = val === 'none' ? null : val
-                                          patchKR(obj.id, kr.id, { owner_id: v })
-                                          saveKRField(kr.id, { owner_id: v })
-                                        }}
-                                      >
-                                        <SelectTrigger className="h-7 text-xs bg-white/5 border-white/8 text-white">
-                                          <SelectValue placeholder="Unassigned" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          <SelectItem value="none">Unassigned</SelectItem>
-                                          {profiles.map(p => (
-                                            <SelectItem key={p.id} value={p.id}>
-                                              {p.full_name ?? p.email ?? p.id.slice(0, 8)}
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                    </div>
-                                  </div>
-                                </div>
-                              )
-                            })}
-
-                            <button
-                              onClick={() => addKR(obj)}
-                              className="flex items-center gap-1.5 text-xs text-white/30 hover:text-[#FF5A70] transition-colors py-1"
-                            >
-                              <PlusCircle size={12} /> Add key result
-                            </button>
                           </div>
                         </div>
                       )
                     })}
+
+                    <button
+                      onClick={() => addKR(obj)}
+                      className="flex items-center gap-1.5 text-xs text-white/30 hover:text-[#FF5A70] transition-colors py-1"
+                    >
+                      <PlusCircle size={12} /> Add key result
+                    </button>
                   </div>
                 )}
               </div>

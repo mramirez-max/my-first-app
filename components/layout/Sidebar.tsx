@@ -14,6 +14,7 @@ import {
   Settings,
   LogOut,
   ChevronRight,
+  BarChart3,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -102,7 +103,10 @@ export default function Sidebar({ profile, areas }: SidebarProps) {
 
         {/* Admin */}
         {profile?.role === 'admin' && (
-          <div className="pt-4">
+          <div className="pt-4 space-y-0.5">
+            <NavItem href="/executive" icon={<BarChart3 size={16} />} active={pathname === '/executive'}>
+              Executive View
+            </NavItem>
             <NavItem href="/admin" icon={<Settings size={16} />} active={pathname === '/admin'}>
               Admin Panel
             </NavItem>
