@@ -3,11 +3,15 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { AreaKRUpdate, CompanyKRUpdate } from '@/types'
+import { Pencil } from 'lucide-react'
+import WeeklyUpdateForm from './WeeklyUpdateForm'
 
 interface UpdateFeedProps {
   keyResultId: string
   type: 'area' | 'company'
   refreshKey?: number
+  canEdit?: boolean
+  currentValue?: number
 }
 
 const CONFIDENCE_LABELS: Record<number, { label: string; color: string }> = {
@@ -18,10 +22,12 @@ const CONFIDENCE_LABELS: Record<number, { label: string; color: string }> = {
   5: { label: 'On track', color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' },
 }
 
-export default function UpdateFeed({ keyResultId, type, refreshKey }: UpdateFeedProps) {
+export default function UpdateFeed({ keyResultId, type, refreshKey, canEdit, currentValue = 0 }: UpdateFeedProps) {
   const supabase = createClient()
   const [updates, setUpdates] = useState<(AreaKRUpdate | CompanyKRUpdate)[]>([])
   const [loading, setLoading] = useState(true)
+  const [editingUpdate, setEditingUpdate] = useState<AreaKRUpdate | CompanyKRUpdate | null>(null)
+  const [internalRefresh, setInternalRefresh] = useState(0)
 
   const table = type === 'area' ? 'area_kr_updates' : 'company_kr_updates'
 
@@ -38,41 +44,69 @@ export default function UpdateFeed({ keyResultId, type, refreshKey }: UpdateFeed
       setLoading(false)
     }
     fetchUpdates()
-  }, [keyResultId, type, refreshKey])
+  }, [keyResultId, type, refreshKey, internalRefresh])
 
   if (loading) return <p className="text-xs text-white/40 py-2">Loading updates...</p>
   if (updates.length === 0) return <p className="text-xs text-white/40 py-2">No updates yet.</p>
 
   return (
-    <div className="space-y-3">
-      {updates.map(update => {
-        const conf = CONFIDENCE_LABELS[update.confidence_score]
-        const author = (update as AreaKRUpdate & { author?: { full_name: string } }).author
-        return (
-          <div key={update.id} className="border border-white/10 rounded-md p-3 space-y-2 bg-gradient-to-br from-[#1c1540] to-[#23174B]">
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-white/70">
-                  Week of {new Date(update.week_date).toLocaleDateString('en-US', {
-                    month: 'short', day: 'numeric', year: 'numeric'
-                  })}
-                </span>
-                <span className="text-xs text-white/30">·</span>
-                <span className="text-xs text-white/50">
-                  {author?.full_name ?? 'Unknown'}
-                </span>
+    <>
+      <div className="space-y-3">
+        {updates.map(update => {
+          const conf = CONFIDENCE_LABELS[update.confidence_score]
+          const author = (update as AreaKRUpdate & { author?: { full_name: string } }).author
+          return (
+            <div key={update.id} className="border border-white/10 rounded-md p-3 space-y-2 bg-gradient-to-br from-[#1c1540] to-[#23174B]">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-white/70">
+                    Week of {new Date(update.week_date).toLocaleDateString('en-US', {
+                      month: 'short', day: 'numeric', year: 'numeric'
+                    })}
+                  </span>
+                  <span className="text-xs text-white/30">·</span>
+                  <span className="text-xs text-white/50">
+                    {author?.full_name ?? 'Unknown'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${conf.color}`}>
+                    {conf.label} ({update.confidence_score}/5)
+                  </span>
+                  {canEdit && (
+                    <button
+                      onClick={() => setEditingUpdate(update)}
+                      className="text-white/25 hover:text-white/70 transition-colors p-0.5"
+                      title="Edit update"
+                    >
+                      <Pencil size={11} />
+                    </button>
+                  )}
+                </div>
               </div>
-              <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${conf.color}`}>
-                {conf.label} ({update.confidence_score}/5)
-              </span>
+              <p className="text-sm text-white/70">{update.update_text}</p>
+              <p className="text-xs text-white/40">
+                Value at update: <span className="font-medium text-white/60">{update.current_value.toLocaleString()}</span>
+              </p>
             </div>
-            <p className="text-sm text-white/70">{update.update_text}</p>
-            <p className="text-xs text-white/40">
-              Value at update: <span className="font-medium text-white/60">{update.current_value.toLocaleString()}</span>
-            </p>
-          </div>
-        )
-      })}
-    </div>
+          )
+        })}
+      </div>
+
+      {editingUpdate && (
+        <WeeklyUpdateForm
+          open={!!editingUpdate}
+          onClose={() => setEditingUpdate(null)}
+          keyResultId={keyResultId}
+          type={type}
+          currentValue={currentValue}
+          existing={editingUpdate}
+          onSuccess={() => {
+            setEditingUpdate(null)
+            setInternalRefresh(k => k + 1)
+          }}
+        />
+      )}
+    </>
   )
 }

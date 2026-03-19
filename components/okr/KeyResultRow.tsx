@@ -124,7 +124,7 @@ export default function KeyResultRow({
         </button>
         {showUpdates && (
           <div className="mt-3">
-            <UpdateFeed keyResultId={keyResult.id} type={type} refreshKey={refreshKey} />
+            <UpdateFeed keyResultId={keyResult.id} type={type} refreshKey={refreshKey} canEdit={canUpdate} currentValue={keyResult.current_value} />
           </div>
         )}
       </div>
