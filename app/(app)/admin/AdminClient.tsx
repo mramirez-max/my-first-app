@@ -72,8 +72,6 @@ export default function AdminClient({ profiles, areas, companyObjectives, quarte
 
   return (
     <div className="space-y-8">
-      <InsightsPanel insights={insights} areaData={areaData} quarter={quarter} year={year} />
-
       {/* Bulk Import section */}
       <section className="rounded-xl border border-white/8 bg-gradient-to-br from-[#1c1540] to-[#23174B] p-5">
         <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -210,6 +208,8 @@ export default function AdminClient({ profiles, areas, companyObjectives, quarte
         year={year}
         onSuccess={() => router.refresh()}
       />
+
+      <InsightsPanel insights={insights} areaData={areaData} quarter={quarter} year={year} areas={areas} />
     </div>
   )
 }
