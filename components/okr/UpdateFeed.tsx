@@ -1,0 +1,78 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import { AreaKRUpdate, CompanyKRUpdate } from '@/types'
+
+interface UpdateFeedProps {
+  keyResultId: string
+  type: 'area' | 'company'
+  refreshKey?: number
+}
+
+const CONFIDENCE_LABELS: Record<number, { label: string; color: string }> = {
+  1: { label: 'Off track', color: 'text-red-400 bg-red-500/10 border-red-500/30' },
+  2: { label: 'At risk', color: 'text-orange-400 bg-orange-500/10 border-orange-500/30' },
+  3: { label: 'Cautious', color: 'text-yellow-300 bg-yellow-400/10 border-yellow-400/30' },
+  4: { label: 'Good', color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' },
+  5: { label: 'On track', color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' },
+}
+
+export default function UpdateFeed({ keyResultId, type, refreshKey }: UpdateFeedProps) {
+  const supabase = createClient()
+  const [updates, setUpdates] = useState<(AreaKRUpdate | CompanyKRUpdate)[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const table = type === 'area' ? 'area_kr_updates' : 'company_kr_updates'
+
+  useEffect(() => {
+    async function fetchUpdates() {
+      setLoading(true)
+      const { data } = await supabase
+        .from(table)
+        .select('*, author:profiles(full_name)')
+        .eq('key_result_id', keyResultId)
+        .order('week_date', { ascending: false })
+        .limit(10)
+      setUpdates(data ?? [])
+      setLoading(false)
+    }
+    fetchUpdates()
+  }, [keyResultId, type, refreshKey])
+
+  if (loading) return <p className="text-xs text-white/40 py-2">Loading updates...</p>
+  if (updates.length === 0) return <p className="text-xs text-white/40 py-2">No updates yet.</p>
+
+  return (
+    <div className="space-y-3">
+      {updates.map(update => {
+        const conf = CONFIDENCE_LABELS[update.confidence_score]
+        const author = (update as AreaKRUpdate & { author?: { full_name: string } }).author
+        return (
+          <div key={update.id} className="border border-white/10 rounded-md p-3 space-y-2 bg-gradient-to-br from-[#1c1540] to-[#23174B]">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-white/70">
+                  Week of {new Date(update.week_date).toLocaleDateString('en-US', {
+                    month: 'short', day: 'numeric', year: 'numeric'
+                  })}
+                </span>
+                <span className="text-xs text-white/30">·</span>
+                <span className="text-xs text-white/50">
+                  {author?.full_name ?? 'Unknown'}
+                </span>
+              </div>
+              <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${conf.color}`}>
+                {conf.label} ({update.confidence_score}/5)
+              </span>
+            </div>
+            <p className="text-sm text-white/70">{update.update_text}</p>
+            <p className="text-xs text-white/40">
+              Value at update: <span className="font-medium text-white/60">{update.current_value.toLocaleString()}</span>
+            </p>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
