@@ -25,7 +25,7 @@ import { createClient } from '@/lib/supabase/client'
 import { BulkAreaInput, BulkObjectiveInput, BulkImportResult } from '@/app/api/ai-bulk-import/route'
 import {
   Upload, FileText, Sparkles, Check, AlertCircle,
-  Loader2, ChevronDown, ChevronUp, PlusCircle, Trash2,
+  Loader2, ChevronDown, ChevronUp, PlusCircle, Trash2, GripVertical,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -69,6 +69,8 @@ export default function BulkImportModal({
   const [expandedAreas, setExpandedAreas] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
   const [savedCount, setSavedCount] = useState(0)
+  const [dragging, setDragging] = useState<{ areaIdx: number; objIdx: number } | null>(null)
+  const [dragOverArea, setDragOverArea] = useState<number | null>(null)
 
   const areaNames = areas.map(a => a.name)
   const coTitles = companyObjectives.map(o => o.title)
@@ -166,6 +168,30 @@ export default function BulkImportModal({
         ),
       }
     ))
+  }
+
+  function moveObjective(fromAreaIdx: number, objIdx: number, toAreaName: string) {
+    if (importData[fromAreaIdx].areaName === toAreaName) return
+    setImportData(prev => {
+      const next = prev.map(a => ({ ...a, objectives: [...a.objectives] }))
+      const [obj] = next[fromAreaIdx].objectives.splice(objIdx, 1)
+      const toIdx = next.findIndex(a => a.areaName === toAreaName)
+      if (toIdx >= 0) {
+        next[toIdx].objectives.push(obj)
+        setExpandedAreas(e => new Set([...e, toAreaName]))
+      }
+      return next
+    })
+  }
+
+  function handleDragStart(areaIdx: number, objIdx: number) {
+    setDragging({ areaIdx, objIdx })
+  }
+
+  function handleDropOnArea(toAreaIdx: number) {
+    if (dragging) moveObjective(dragging.areaIdx, dragging.objIdx, importData[toAreaIdx].areaName)
+    setDragging(null)
+    setDragOverArea(null)
   }
 
   async function handleGenerate() {
@@ -436,12 +462,17 @@ export default function BulkImportModal({
               {importData.map((areaData, areaIdx) => {
                 const isExpanded = expandedAreas.has(areaData.areaName)
                 const hasData = areaData.objectives.length > 0
+                const isDropTarget = dragOverArea === areaIdx && dragging?.areaIdx !== areaIdx
 
                 return (
                   <div
                     key={areaData.areaName}
+                    onDragOver={e => { e.preventDefault(); setDragOverArea(areaIdx) }}
+                    onDragLeave={() => setDragOverArea(null)}
+                    onDrop={() => handleDropOnArea(areaIdx)}
                     className={cn(
-                      'rounded-xl border overflow-hidden',
+                      'rounded-xl border overflow-hidden transition-colors',
+                      isDropTarget ? 'border-[#FF5A70]/50 bg-[#FF5A70]/5' :
                       hasData ? 'border-white/10 bg-gradient-to-br from-[#1c1540] to-[#23174B]' : 'border-white/5 bg-white/2'
                     )}
                   >
@@ -472,11 +503,18 @@ export default function BulkImportModal({
                     {isExpanded && hasData && (
                       <div className="px-4 pb-4 space-y-4 border-t border-white/8">
                         {areaData.objectives.map((obj, objIdx) => (
-                          <div key={objIdx} className="pt-4 space-y-3">
+                          <div
+                            key={objIdx}
+                            draggable
+                            onDragStart={() => handleDragStart(areaIdx, objIdx)}
+                            onDragEnd={() => { setDragging(null); setDragOverArea(null) }}
+                            className="pt-4 space-y-3"
+                          >
                             {/* Objective row */}
                             <div className="space-y-2">
                               <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold text-white/30 uppercase tracking-wider shrink-0">
+                                <GripVertical size={13} className="text-white/20 cursor-grab shrink-0" />
+                                <span className="text-xs font-bold text-white/30 uppercase tracking-wider">
                                   Objective {objIdx + 1}
                                 </span>
                               </div>
@@ -487,13 +525,13 @@ export default function BulkImportModal({
                                 className="text-sm resize-none bg-white/5 border-white/10 text-white focus:border-[#FF5A70]/50"
                                 placeholder="Objective title..."
                               />
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 <span className="text-xs text-white/40 shrink-0">Aligned to:</span>
                                 <Select
                                   value={obj.alignedToIndex !== null ? String(obj.alignedToIndex) : 'none'}
                                   onValueChange={val => updateObjectiveAlignment(areaIdx, objIdx, val)}
                                 >
-                                  <SelectTrigger className="h-7 text-xs bg-white/5 border-white/10 text-white flex-1">
+                                  <SelectTrigger className="h-7 text-xs bg-white/5 border-white/10 text-white flex-1 min-w-[140px]">
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -510,6 +548,23 @@ export default function BulkImportModal({
                                     CO{obj.alignedToIndex + 1}
                                   </span>
                                 )}
+                                <span className="text-xs text-white/20 shrink-0">·</span>
+                                <span className="text-xs text-white/40 shrink-0">Move to:</span>
+                                <Select
+                                  value={areaData.areaName}
+                                  onValueChange={toAreaName => moveObjective(areaIdx, objIdx, toAreaName)}
+                                >
+                                  <SelectTrigger className="h-7 text-xs bg-white/5 border-white/10 text-white flex-1 min-w-[120px]">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {importData.map(a => (
+                                      <SelectItem key={a.areaName} value={a.areaName}>
+                                        {a.areaName}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
                               </div>
                             </div>
 
