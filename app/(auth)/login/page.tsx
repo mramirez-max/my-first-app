@@ -66,9 +66,8 @@ function LoginForm() {
       <div className="w-full max-w-md px-4">
         {/* Logo / brand */}
         <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <h1 className="text-3xl font-bold text-white tracking-tight">Ontop</h1>
-            <span className="w-2.5 h-2.5 rounded-full bg-[#FF5A70] shrink-0" />
+          <div className="flex justify-center mb-3">
+            <img src="/logo-ontop.png" alt="Ontop" className="h-10 w-auto" />
           </div>
           <p className="text-white/50 text-sm">OKR Operating System</p>
         </div>
