@@ -61,11 +61,8 @@ export default function Sidebar({ profile, areas }: SidebarProps) {
     <aside className="w-64 bg-[#1a1040] border-r border-white/8 flex flex-col h-screen">
       {/* Logo */}
       <div className="px-5 py-5 border-b border-white/8">
-        <div className="flex items-center gap-2">
-          <h1 className="text-lg font-bold text-white tracking-tight">Ontop</h1>
-          <span className="w-2 h-2 rounded-full bg-[#FF5A70] shrink-0" />
-        </div>
-        <p className="text-xs text-white/40 mt-0.5">Borderless Workforce</p>
+        <img src="/logo-ontop.png" alt="Ontop" className="h-8 w-auto mb-1" />
+        <p className="text-xs text-white/40">Global workforce, powered by AI</p>
       </div>
 
       {/* Navigation */}
