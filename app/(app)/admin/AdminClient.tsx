@@ -25,7 +25,6 @@ import { useRouter } from 'next/navigation'
 import SeedCompanyOKRsButton from './SeedCompanyOKRsButton'
 import BulkImportModal from '@/components/admin/BulkImportModal'
 import InviteUserModal from '@/components/admin/InviteUserModal'
-import InsightsPanel, { ComputedInsight, AreaInsightData } from '@/components/admin/InsightsPanel'
 import OKRManager from '@/components/admin/OKRManager'
 import { Upload, UserPlus } from 'lucide-react'
 
@@ -35,8 +34,6 @@ interface AdminClientProps {
   companyObjectives: CompanyObjective[]
   quarter: number
   year: number
-  insights: ComputedInsight[]
-  areaData: AreaInsightData[]
   initialObjectives: React.ComponentProps<typeof OKRManager>['initialObjectives']
 }
 
@@ -52,7 +49,7 @@ const ROLE_BADGE: Record<Role, 'default' | 'secondary' | 'outline'> = {
   team_member: 'outline',
 }
 
-export default function AdminClient({ profiles, areas, companyObjectives, quarter, year, insights, areaData, initialObjectives }: AdminClientProps) {
+export default function AdminClient({ profiles, areas, companyObjectives, quarter, year, initialObjectives }: AdminClientProps) {
   const supabase = createClient()
   const router = useRouter()
   const [saving, setSaving] = useState<string | null>(null)
@@ -221,7 +218,6 @@ export default function AdminClient({ profiles, areas, companyObjectives, quarte
         year={year}
       />
 
-      <InsightsPanel insights={insights} areaData={areaData} quarter={quarter} year={year} areas={areas} />
     </div>
   )
 }

@@ -147,8 +147,6 @@ export default async function AdminPage() {
         companyObjectives={companyObjectives ?? []}
         quarter={quarter}
         year={year}
-        insights={insights}
-        areaData={areaData}
         initialObjectives={initialObjectives}
       />
     </div>
