@@ -33,7 +33,7 @@ export async function proxy(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
 
   const isAuthRoute = request.nextUrl.pathname.startsWith('/login')
-  const isPublicRoute = isAuthRoute
+  const isPublicRoute = isAuthRoute || request.nextUrl.pathname.startsWith('/auth/callback')
 
   if (!user && !isPublicRoute) {
     const url = request.nextUrl.clone()
