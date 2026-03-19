@@ -24,6 +24,7 @@ import { useRouter } from 'next/navigation'
 import SeedCompanyOKRsButton from './SeedCompanyOKRsButton'
 import BulkImportModal from '@/components/admin/BulkImportModal'
 import InviteUserModal from '@/components/admin/InviteUserModal'
+import InsightsPanel, { ComputedInsight, AreaInsightData } from '@/components/admin/InsightsPanel'
 import { Upload, UserPlus } from 'lucide-react'
 
 interface AdminClientProps {
@@ -32,6 +33,8 @@ interface AdminClientProps {
   companyObjectives: CompanyObjective[]
   quarter: number
   year: number
+  insights: ComputedInsight[]
+  areaData: AreaInsightData[]
 }
 
 const ROLE_LABELS: Record<Role, string> = {
@@ -46,7 +49,7 @@ const ROLE_BADGE: Record<Role, 'default' | 'secondary' | 'outline'> = {
   team_member: 'outline',
 }
 
-export default function AdminClient({ profiles, areas, companyObjectives, quarter, year }: AdminClientProps) {
+export default function AdminClient({ profiles, areas, companyObjectives, quarter, year, insights, areaData }: AdminClientProps) {
   const supabase = createClient()
   const router = useRouter()
   const [saving, setSaving] = useState<string | null>(null)
@@ -69,6 +72,8 @@ export default function AdminClient({ profiles, areas, companyObjectives, quarte
 
   return (
     <div className="space-y-8">
+      <InsightsPanel insights={insights} areaData={areaData} quarter={quarter} year={year} />
+
       {/* Bulk Import section */}
       <section className="rounded-xl border border-white/8 bg-gradient-to-br from-[#1c1540] to-[#23174B] p-5">
         <div className="flex items-start justify-between gap-4 flex-wrap">
