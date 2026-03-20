@@ -33,7 +33,10 @@ export async function proxy(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
 
   const isAuthRoute = request.nextUrl.pathname.startsWith('/login')
-  const isPublicRoute = isAuthRoute || request.nextUrl.pathname.startsWith('/auth/callback')
+  const isPublicRoute =
+    isAuthRoute ||
+    request.nextUrl.pathname.startsWith('/auth/callback') ||
+    request.nextUrl.pathname.startsWith('/api/send-slack-insights')
 
   if (!user && !isPublicRoute) {
     const url = request.nextUrl.clone()

@@ -20,7 +20,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     .order('name')
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-[#0e0928]">
       <Sidebar profile={profile} areas={areas ?? []} />
       <main className="flex-1 overflow-y-auto">
         {children}
