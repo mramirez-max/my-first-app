@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/send-slack-insights",
+      "schedule": "0 13 * * *"
+    }
+  ]
+}

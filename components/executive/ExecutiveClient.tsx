@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Area } from '@/types'
 import { ComputedInsight, AreaInsightData } from '@/components/admin/InsightsPanel'
 import InsightsPanel from '@/components/admin/InsightsPanel'
-import { Sparkles, Loader2, ChevronDown, ChevronUp, MessageSquare } from 'lucide-react'
+import { Sparkles, Loader2, ChevronDown, ChevronUp, MessageSquare, Send, CheckCircle2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface AreaQuestion {
@@ -34,6 +34,32 @@ export default function ExecutiveClient({
   const [generated, setGenerated] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [expandedAreas, setExpandedAreas] = useState<Set<string>>(new Set())
+  const [sending, setSending] = useState(false)
+  const [sent, setSent] = useState(false)
+  const [sendError, setSendError] = useState<string | null>(null)
+
+  async function sendToSlack() {
+    setSending(true)
+    setSendError(null)
+    setSent(false)
+    try {
+      const res = await fetch('/api/send-slack-insights', {
+        method: 'POST',
+        headers: { 'x-manual-send': '1' },
+      })
+      const data = await res.json()
+      if (!res.ok || !data.ok) {
+        setSendError(data.error ?? `Failed (${res.status})`)
+        return
+      }
+      setSent(true)
+      setTimeout(() => setSent(false), 4000)
+    } catch (err) {
+      setSendError(err instanceof Error ? err.message : 'Unknown error')
+    } finally {
+      setSending(false)
+    }
+  }
 
   async function generateQuestions() {
     setGenerating(true)
@@ -76,6 +102,33 @@ export default function ExecutiveClient({
 
   return (
     <div className="space-y-8">
+      {/* Send to Slack bar */}
+      <div className="flex items-center justify-between gap-4 rounded-xl border border-white/8 bg-white/3 px-5 py-3">
+        <div className="flex items-center gap-2 text-sm text-white/60">
+          <span>Daily briefing scheduled for</span>
+          <span className="font-medium text-white/80">8:00 AM EST · #cos</span>
+        </div>
+        <div className="flex items-center gap-3">
+          {sendError && <p className="text-xs text-red-400">{sendError}</p>}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={sendToSlack}
+            disabled={sending}
+            className="gap-2 border-white/15 text-white/70 hover:text-white hover:bg-white/5 shrink-0"
+          >
+            {sending ? (
+              <Loader2 size={13} className="animate-spin" />
+            ) : sent ? (
+              <CheckCircle2 size={13} className="text-emerald-400" />
+            ) : (
+              <Send size={13} />
+            )}
+            {sending ? 'Sending…' : sent ? 'Sent to #cos!' : 'Send now'}
+          </Button>
+        </div>
+      </div>
+
       {/* Insights section */}
       <InsightsPanel
         insights={insights}
