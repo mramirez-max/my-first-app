@@ -197,9 +197,14 @@ Output only the Slack message. No preamble, no explanation.`
       messages: [{ role: 'user', content: prompt }],
     })
 
-    const message = aiResponse.content[0].type === 'text'
+    const raw = aiResponse.content[0].type === 'text'
       ? aiResponse.content[0].text
       : 'Executive briefing unavailable.'
+
+    // Enforce double blank line before each area header (*Bold* lines that start a section)
+    const message = raw
+      .replace(/---+\n?/g, '')                          // strip any "---" dividers
+      .replace(/\n(\*[^*\n]+\*\n)/g, '\n\n\n$1')       // double-space before area headers
 
     await postToSlack(message)
 
