@@ -36,7 +36,8 @@ export async function proxy(request: NextRequest) {
   const isPublicRoute =
     isAuthRoute ||
     request.nextUrl.pathname.startsWith('/auth/callback') ||
-    request.nextUrl.pathname.startsWith('/api/send-slack-insights')
+    request.nextUrl.pathname.startsWith('/api/send-slack-insights') ||
+    request.nextUrl.pathname.startsWith('/api/slack/')
 
   if (!user && !isPublicRoute) {
     const url = request.nextUrl.clone()
