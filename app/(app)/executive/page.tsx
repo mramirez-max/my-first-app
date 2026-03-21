@@ -63,8 +63,8 @@ export default async function ExecutivePage() {
     const areaName = getAreaName(obj)
     for (const kr of getKRs(obj)) {
       if (!kr.updates || kr.updates.length === 0) {
-        const short = kr.description.length > 50 ? kr.description.slice(0, 50) + '…' : kr.description
-        insights.push({ type: 'stale', area: areaName, krId: kr.id, message: `"${short}" — never updated` })
+        const short = kr.description.length > 60 ? kr.description.slice(0, 60) + '…' : kr.description
+        insights.push({ type: 'stale', area: areaName, krId: kr.id, message: `"${short}" — never updated`, detail: kr.description })
       }
     }
   }
@@ -75,8 +75,8 @@ export default async function ExecutivePage() {
       if (!kr.updates || kr.updates.length === 0) continue
       const latest = [...kr.updates].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
       if (latest.confidence_score <= 2) {
-        const short = kr.description.length > 50 ? kr.description.slice(0, 50) + '…' : kr.description
-        insights.push({ type: 'at_risk', area: areaName, krId: kr.id, message: `"${short}" — confidence ${latest.confidence_score}/5` })
+        const short = kr.description.length > 60 ? kr.description.slice(0, 60) + '…' : kr.description
+        insights.push({ type: 'at_risk', area: areaName, krId: kr.id, message: `"${short}" — confidence ${latest.confidence_score}/5`, detail: kr.description })
       }
     }
   }

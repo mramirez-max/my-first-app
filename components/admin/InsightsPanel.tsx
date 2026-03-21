@@ -12,6 +12,7 @@ export interface ComputedInsight {
   areaId?: string
   krId?: string
   message: string
+  detail?: string  // full KR description, shown on expand
 }
 
 export interface AreaInsightData {
@@ -58,6 +59,7 @@ export default function InsightsPanel({ insights, areaData, areas, quarter, year
   const [page, setPage]             = useState(0)
 
   // Triage state
+  const [expanded, setExpanded]     = useState<Set<string>>(new Set())
   const [hidden, setHidden]         = useState<Set<string>>(new Set())
   const [resolved, setResolved]     = useState<Set<string>>(new Set())
   const [showHidden, setShowHidden] = useState(false)
@@ -278,8 +280,10 @@ export default function InsightsPanel({ insights, areaData, areas, quarter, year
             const action     = activeAction[key] ?? null
             const isResolved = resolved.has(key)
             const isHidden   = hidden.has(key)
+            const isExpanded = expanded.has(key)
             const canUpdate  = (ins.type === 'stale' || ins.type === 'at_risk') && 'krId' in ins && !!ins.krId
             const form       = updateForms[key] ?? { text: '', score: ins.type === 'at_risk' ? 2 : 3, value: '', submitting: false, error: null }
+            const hasDetail  = 'detail' in ins && !!ins.detail
 
             return (
               <li key={i} className={`rounded-lg border overflow-hidden transition-opacity ${cfg.bg} ${cfg.border} ${isHidden ? 'opacity-40' : ''}`}>
@@ -289,9 +293,25 @@ export default function InsightsPanel({ insights, areaData, areas, quarter, year
                   <Icon size={14} className={`shrink-0 ${cfg.color}`} />
                   <div className="min-w-0 flex-1">
                     <span className={`text-xs font-medium ${cfg.color} mr-2`}>{ins.area}</span>
-                    <span className={`text-sm ${isResolved ? 'line-through text-white/30' : 'text-white/70'}`}>
-                      {ins.message}
-                    </span>
+                    <button
+                      onClick={() => hasDetail
+                        ? setExpanded(prev => { const s = new Set(prev); s.has(key) ? s.delete(key) : s.add(key); return s })
+                        : undefined
+                      }
+                      className={`text-sm text-left transition-colors ${
+                        isResolved ? 'line-through text-white/30' : 'text-white/70'
+                      } ${hasDetail ? 'hover:text-white cursor-pointer' : 'cursor-default'}`}
+                    >
+                      {isExpanded && hasDetail
+                        ? (ins as ComputedInsight).detail
+                        : ins.message}
+                      {hasDetail && !isExpanded && (
+                        <span className={`ml-1 text-xs ${cfg.color} opacity-60`}>· see full</span>
+                      )}
+                      {hasDetail && isExpanded && (
+                        <span className={`ml-1 text-xs ${cfg.color} opacity-60`}>· collapse</span>
+                      )}
+                    </button>
                   </div>
 
                   {isResolved ? (
