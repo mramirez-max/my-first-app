@@ -25,7 +25,11 @@ export async function POST(request: NextRequest) {
             controller.enqueue(encoder.encode(chunk.delta.text))
           }
         }
-      } finally {
+        controller.close()
+      } catch (err) {
+        // Stream an error message so the client shows something meaningful
+        const msg = err instanceof Error ? err.message : 'Unknown error'
+        controller.enqueue(encoder.encode(`⚠️ Error: ${msg}`))
         controller.close()
       }
     },

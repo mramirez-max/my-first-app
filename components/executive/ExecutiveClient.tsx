@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Area } from '@/types'
 import { ComputedInsight, AreaInsightData } from '@/components/admin/InsightsPanel'
 import InsightsPanel from '@/components/admin/InsightsPanel'
-import { Loader2, Send, CheckCircle2, Bot, User, Sparkles, BarChart2, History, ArrowLeft, Plus } from 'lucide-react'
+import { Loader2, Send, CheckCircle2, Bot, User, Sparkles, BarChart2, History, ArrowLeft, Plus, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import ReactMarkdown from 'react-markdown'
 
@@ -174,6 +174,13 @@ export default function ExecutiveClient({
     setShowHistory(false)
   }
 
+  function deleteSession(id: string, e: React.MouseEvent) {
+    e.stopPropagation()
+    const updated = savedSessions.filter(s => s.id !== id)
+    setSavedSessions(updated)
+    localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(updated))
+  }
+
   async function sendToSlack() {
     setSending(true)
     setSendError(null)
@@ -225,10 +232,13 @@ export default function ExecutiveClient({
         setStreamingText(full)
       }
 
-      setChatMessages(prev => [...prev, { role: 'assistant', content: full }])
+      setChatMessages(prev => [...prev, {
+        role: 'assistant',
+        content: full || '⚠️ No response received. Check that ANTHROPIC_API_KEY is set in your deployment environment.',
+      }])
       setStreamingText('')
     } catch {
-      setChatMessages(prev => [...prev, { role: 'assistant', content: 'Something went wrong. Please try again.' }])
+      setChatMessages(prev => [...prev, { role: 'assistant', content: '⚠️ Something went wrong. Please try again.' }])
     } finally {
       setStreaming(false)
       setTimeout(() => inputRef.current?.focus(), 50)
@@ -334,20 +344,26 @@ export default function ExecutiveClient({
                 <p className="text-sm text-white/30 italic">No past conversations yet.</p>
               ) : (
                 savedSessions.map(session => (
-                  <button key={session.id} onClick={() => loadSession(session)}
-                    className="w-full text-left rounded-xl border border-white/8 bg-white/3 px-4 py-3 hover:bg-white/6 hover:border-white/15 transition-all group">
-                    <div className="flex items-start justify-between gap-3">
-                      <p className="text-sm text-white/75 group-hover:text-white transition-colors line-clamp-2 flex-1">
-                        {session.preview || '(no preview)'}
+                  <div key={session.id}
+                    className="w-full text-left rounded-xl border border-white/8 bg-white/3 hover:bg-white/6 hover:border-white/15 transition-all group relative">
+                    <button onClick={() => loadSession(session)} className="w-full text-left px-4 py-3 pr-10">
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="text-sm text-white/75 group-hover:text-white transition-colors line-clamp-2 flex-1">
+                          {session.preview || '(no preview)'}
+                        </p>
+                        <span className="text-xs text-white/25 whitespace-nowrap mt-0.5">
+                          {formatDate(session.savedAt)}
+                        </span>
+                      </div>
+                      <p className="text-xs text-white/25 mt-1">
+                        {session.messages.length} message{session.messages.length !== 1 ? 's' : ''}
                       </p>
-                      <span className="text-xs text-white/25 whitespace-nowrap mt-0.5">
-                        {formatDate(session.savedAt)}
-                      </span>
-                    </div>
-                    <p className="text-xs text-white/25 mt-1">
-                      {session.messages.length} message{session.messages.length !== 1 ? 's' : ''}
-                    </p>
-                  </button>
+                    </button>
+                    <button onClick={(e) => deleteSession(session.id, e)}
+                      className="absolute top-3 right-3 p-1.5 rounded-lg text-white/20 hover:text-red-400 hover:bg-red-400/10 transition-colors opacity-0 group-hover:opacity-100">
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
                 ))
               )}
             </div>
