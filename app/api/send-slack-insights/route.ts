@@ -168,11 +168,11 @@ Write a Slack message that reads like a sharp, strategic executive brief — not
 
 2. Follow with ONE short line summarizing today's biggest themes across all areas (max 20 words).
 
-3. Then select the 3 to 5 most urgent areas. For each area, write EXACTLY this format:
+3. Then select the 3 to 5 most urgent areas. For each area, write EXACTLY this format (leave a blank line between areas — no "---" or dividers):
 
 *[Area Name]*
-• 🔴 *At risk:* [One sentence — the most pressing business risk or execution gap. Sound like a leadership risk, not a KR description. Be specific.]
-• 🟡 *Missing:* [One sentence — the most important blind spot, stale signal, missing update, or execution gap. Say what's missing and why it matters.]
+• 🔥 *At risk:* [One sentence — the most pressing business risk or execution gap. Sound like a leadership risk, not a KR description. Be specific. Bold any key metrics, numbers, or critical terms.]
+• 👀 *Missing:* [One sentence — the most important blind spot, stale signal, missing update, or execution gap. Say what's missing and why it matters. Bold any key metrics, numbers, or critical terms.]
 • ❓ *Ask:* [One sharp, decision-useful question the CEO/COO should ask the area owner today.]
 
 Rules:
@@ -181,6 +181,8 @@ Rules:
 - Sound like an operator, not a consultant. No generic phrases like "ensure alignment" or "drive performance."
 - Confidence score of 1-2 = at risk. Never updated = missing signal. No OKRs = flying blind.
 - Rank areas by urgency — most critical first.
+- Separate areas with a blank line only — never use "---" or any other divider.
+- Bold key metrics, numbers, percentages, account names, or any high-signal facts (use Slack bold: *like this*).
 - If all areas look healthy, say so in one sentence instead of listing areas.
 
 4. End with exactly this line:
