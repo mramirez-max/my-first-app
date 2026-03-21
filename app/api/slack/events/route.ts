@@ -129,7 +129,7 @@ async function buildOKRContext(): Promise<string> {
     .map(([name, krs]) => `*${name}*\n${krs.join('\n')}`)
     .join('\n\n') || '(No area OKRs set this quarter.)'
 
-  return `const context = `You are the AI Chief of Staff for Ontop.
+return `You are the AI Chief of Staff for Ontop.
 
 You answer questions about company execution, OKRs, risks, and performance.
 
