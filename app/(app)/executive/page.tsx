@@ -64,7 +64,7 @@ export default async function ExecutivePage() {
     for (const kr of getKRs(obj)) {
       if (!kr.updates || kr.updates.length === 0) {
         const short = kr.description.length > 50 ? kr.description.slice(0, 50) + '…' : kr.description
-        insights.push({ type: 'stale', area: areaName, message: `"${short}" — never updated` })
+        insights.push({ type: 'stale', area: areaName, krId: kr.id, message: `"${short}" — never updated` })
       }
     }
   }
@@ -76,7 +76,7 @@ export default async function ExecutivePage() {
       const latest = [...kr.updates].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
       if (latest.confidence_score <= 2) {
         const short = kr.description.length > 50 ? kr.description.slice(0, 50) + '…' : kr.description
-        insights.push({ type: 'at_risk', area: areaName, message: `"${short}" — confidence ${latest.confidence_score}/5` })
+        insights.push({ type: 'at_risk', area: areaName, krId: kr.id, message: `"${short}" — confidence ${latest.confidence_score}/5` })
       }
     }
   }
