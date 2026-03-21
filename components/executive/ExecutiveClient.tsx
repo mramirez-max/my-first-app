@@ -7,6 +7,7 @@ import { ComputedInsight, AreaInsightData } from '@/components/admin/InsightsPan
 import InsightsPanel from '@/components/admin/InsightsPanel'
 import { Loader2, Send, CheckCircle2, Bot, User, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import ReactMarkdown from 'react-markdown'
 
 interface AreaPayload extends AreaInsightData {
   companyObjectives: string[]
@@ -244,12 +245,28 @@ export default function ExecutiveClient({
                 </div>
               )}
               <div className={cn(
-                'max-w-[82%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap',
+                'max-w-[82%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed',
                 msg.role === 'user'
-                  ? 'bg-white/10 text-white rounded-tr-sm'
-                  : 'bg-white/5 text-white/85 rounded-tl-sm',
+                  ? 'bg-white/10 text-white rounded-tr-sm whitespace-pre-wrap'
+                  : 'bg-white/5 text-white/85 rounded-tl-sm prose prose-invert prose-sm max-w-none',
               )}>
-                {msg.content}
+                {msg.role === 'user' ? msg.content : (
+                  <ReactMarkdown
+                    components={{
+                      h1: ({ children }) => <p className="font-bold text-white mb-1">{children}</p>,
+                      h2: ({ children }) => <p className="font-semibold text-white/90 mb-1">{children}</p>,
+                      h3: ({ children }) => <p className="font-semibold text-white/80 mb-0.5">{children}</p>,
+                      strong: ({ children }) => <strong className="font-semibold text-white">{children}</strong>,
+                      ul: ({ children }) => <ul className="list-disc list-inside space-y-0.5 my-1">{children}</ul>,
+                      ol: ({ children }) => <ol className="list-decimal list-inside space-y-0.5 my-1">{children}</ol>,
+                      li: ({ children }) => <li className="text-white/80">{children}</li>,
+                      p: ({ children }) => <p className="mb-1 last:mb-0">{children}</p>,
+                      code: ({ children }) => <code className="bg-white/10 px-1 rounded text-xs">{children}</code>,
+                    }}
+                  >
+                    {msg.content}
+                  </ReactMarkdown>
+                )}
               </div>
               {msg.role === 'user' && (
                 <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center shrink-0 mt-0.5">
@@ -265,11 +282,27 @@ export default function ExecutiveClient({
               <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[#FF5A70] to-[#4A268C] flex items-center justify-center shrink-0 mt-0.5">
                 <Bot size={11} className="text-white" />
               </div>
-              <div className="max-w-[82%] rounded-2xl rounded-tl-sm px-4 py-2.5 text-sm leading-relaxed bg-white/5 text-white/85 whitespace-pre-wrap">
-                {streamingText
-                  ? <>{streamingText}<span className="inline-block w-0.5 h-3.5 bg-white/50 ml-0.5 animate-pulse align-middle" /></>
-                  : <span className="flex items-center gap-1.5 text-white/30"><Loader2 size={12} className="animate-spin" />Thinking…</span>
-                }
+              <div className="max-w-[82%] rounded-2xl rounded-tl-sm px-4 py-2.5 text-sm leading-relaxed bg-white/5 text-white/85 prose prose-invert prose-sm max-w-none">
+                {streamingText ? (
+                  <ReactMarkdown
+                    components={{
+                      h1: ({ children }) => <p className="font-bold text-white mb-1">{children}</p>,
+                      h2: ({ children }) => <p className="font-semibold text-white/90 mb-1">{children}</p>,
+                      h3: ({ children }) => <p className="font-semibold text-white/80 mb-0.5">{children}</p>,
+                      strong: ({ children }) => <strong className="font-semibold text-white">{children}</strong>,
+                      ul: ({ children }) => <ul className="list-disc list-inside space-y-0.5 my-1">{children}</ul>,
+                      ol: ({ children }) => <ol className="list-decimal list-inside space-y-0.5 my-1">{children}</ol>,
+                      li: ({ children }) => <li className="text-white/80">{children}</li>,
+                      p: ({ children }) => <p className="mb-1 last:mb-0">{children}</p>,
+                      code: ({ children }) => <code className="bg-white/10 px-1 rounded text-xs">{children}</code>,
+                    }}
+                  >
+                    {streamingText}
+                  </ReactMarkdown>
+                ) : (
+                  <span className="flex items-center gap-1.5 text-white/30"><Loader2 size={12} className="animate-spin" />Thinking…</span>
+                )}
+                {streamingText && <span className="inline-block w-0.5 h-3.5 bg-white/50 ml-0.5 animate-pulse align-middle" />}
               </div>
             </div>
           )}
