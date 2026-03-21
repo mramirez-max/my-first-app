@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import Anthropic from '@anthropic-ai/sdk'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentQuarter } from '@/types'
 import { getTodayMeetingTitles, getAreasForMeetings } from '@/lib/google-calendar'
@@ -43,12 +44,15 @@ export async function POST(request: NextRequest) {
       todayAreas = getAreasForMeetings(meetingTitles)
     } catch (err) {
       calendarError = err instanceof Error ? err.message : String(err)
-      // Fall back to all areas if calendar is unavailable
     }
 
     const noMeetingsToday = todayAreas.length === 0 && !calendarError
 
-    // Step 2: Fetch OKR data, filtered to today's areas if we have them
+    if (noMeetingsToday) {
+      return NextResponse.json({ ok: true, skipped: true, reason: 'No leadership meetings today' })
+    }
+
+    // Step 2: Fetch OKR data
     const supabase = createAdminClient()
     const { quarter, year } = getCurrentQuarter()
 
@@ -71,95 +75,137 @@ export async function POST(request: NextRequest) {
       return (obj.key_results as KRRow[]) ?? []
     }
 
-    // Filter objectives to only today's scheduled areas (or all if calendar failed)
+    // Filter to today's areas (or all if calendar failed)
     const filteredObjectives = calendarError || todayAreas.length === 0
       ? (areaObjectives ?? []) as unknown as ObjRow[]
       : (areaObjectives ?? []).filter(o =>
           todayAreas.includes(getAreaName(o as unknown as ObjRow))
         ) as unknown as ObjRow[]
 
-    const filteredAreaNames = new Set(filteredObjectives.map(o => getAreaName(o)))
-
-    // Missing OKRs — only for today's areas
     const relevantAreas = calendarError || todayAreas.length === 0
       ? (areas ?? [])
       : (areas ?? []).filter(a => todayAreas.includes(a.name))
 
     const areaIdsWithOKRs = new Set((areaObjectives ?? []).map(o => (o as unknown as ObjRow).area_id))
-    const missing: string[] = relevantAreas
+    const missingAreas: string[] = relevantAreas
       .filter(a => !areaIdsWithOKRs.has(a.id))
       .map(a => a.name)
 
-    const stale: { area: string; kr: string }[] = []
-    const atRisk: { area: string; kr: string; score: number }[] = []
+    // Step 3: Build rich per-area data for AI summarization
+    type AreaInsight = {
+      area: string
+      hasOKRs: boolean
+      keyResults: {
+        description: string
+        confidenceScore: number | null
+        latestUpdate: string | null
+        neverUpdated: boolean
+      }[]
+    }
 
-    for (const obj of filteredObjectives) {
+    const areaInsights: AreaInsight[] = filteredObjectives.map(obj => {
       const areaName = getAreaName(obj)
-      for (const kr of getKRs(obj)) {
-        if (!kr.updates || kr.updates.length === 0) {
-          const short = kr.description.length > 60 ? kr.description.slice(0, 60) + '…' : kr.description
-          stale.push({ area: areaName, kr: short })
-        } else {
-          const latest = [...kr.updates].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
-          if (latest.confidence_score <= 2) {
-            const short = kr.description.length > 60 ? kr.description.slice(0, 60) + '…' : kr.description
-            atRisk.push({ area: areaName, kr: short, score: latest.confidence_score })
+      const krs = getKRs(obj)
+      return {
+        area: areaName,
+        hasOKRs: true,
+        keyResults: krs.map(kr => {
+          const sorted = (kr.updates ?? []).sort(
+            (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          )
+          const latest = sorted[0] ?? null
+          return {
+            description: kr.description,
+            confidenceScore: latest?.confidence_score ?? null,
+            latestUpdate: latest?.update_text ?? null,
+            neverUpdated: !latest,
           }
-        }
+        }),
+      }
+    })
+
+    // Add areas that have no OKRs at all
+    for (const name of missingAreas) {
+      if (!areaInsights.find(a => a.area === name)) {
+        areaInsights.push({ area: name, hasOKRs: false, keyResults: [] })
       }
     }
 
-    // Step 3: Build the Slack message
+    // Step 4: AI summarization pass
     const today = new Date().toLocaleDateString('en-US', {
       weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/Bogota',
     })
+    const reviewLabel = todayAreas.length > 0 ? todayAreas.join(', ') : 'All Areas'
 
-    // Skip if no meetings today and calendar is working fine
-    if (noMeetingsToday) {
-      return NextResponse.json({ ok: true, skipped: true, reason: 'No leadership meetings today' })
-    }
-
-    const reviewLabel = todayAreas.length > 0
-      ? todayAreas.join(', ')
-      : 'All Areas'
-
-    let message = `*📊 OKR Briefing — Q${quarter} ${year} | ${today}*\n`
-    message += `_Today's reviews: ${reviewLabel}_\n\n`
-
-    if (calendarError) {
-      message += `⚠️ _Calendar unavailable — showing all areas. Error: ${calendarError}_\n\n`
-    }
-
-    if (atRisk.length === 0 && stale.length === 0 && missing.length === 0) {
-      message += `✅ *All green!* No flagged items for today's areas.\n`
-    } else {
-      if (atRisk.length > 0) {
-        message += `*🔴 At-Risk Key Results (confidence ≤ 2/5)*\n`
-        atRisk.forEach(r => { message += `• *${r.area}:* ${r.kr} _(${r.score}/5)_\n` })
-        message += '\n'
+    const areaDataText = areaInsights.map(a => {
+      if (!a.hasOKRs) {
+        return `Area: ${a.area}\nStatus: No OKRs set for this quarter.\n`
       }
-      if (stale.length > 0) {
-        message += `*🟠 Never Updated KRs*\n`
-        stale.forEach(r => { message += `• *${r.area}:* ${r.kr}\n` })
-        message += '\n'
-      }
-      if (missing.length > 0) {
-        message += `*🟡 No OKRs Set*\n`
-        missing.forEach(a => { message += `• ${a}\n` })
-        message += '\n'
-      }
-    }
+      const krLines = a.keyResults.map(kr => {
+        const score = kr.confidenceScore !== null ? `Confidence: ${kr.confidenceScore}/5` : 'Confidence: not rated'
+        const update = kr.neverUpdated
+          ? 'Latest update: never updated'
+          : `Latest update: "${kr.latestUpdate ?? ''}"`
+        return `  - KR: ${kr.description}\n    ${score}\n    ${update}`
+      }).join('\n')
+      return `Area: ${a.area}\n${krLines || '  (no key results)'}`
+    }).join('\n\n')
 
-    message += `_Full details + suggested questions → Executive View_`
+    const prompt = `You are an AI Chief of Staff preparing a daily executive briefing for the CEO (Julian) and COO (Cami) of Ontop, a global payroll and workforce platform.
+
+Today is ${today}. Today's leadership reviews: ${reviewLabel}.
+Quarter: Q${quarter} ${year}.
+${calendarError ? `Note: Calendar was unavailable, showing all areas.\n` : ''}
+
+Here is the raw OKR data for today's areas:
+
+${areaDataText}
+
+Write a Slack message that reads like a sharp, strategic executive brief — not a database export. Follow these rules exactly:
+
+1. Start with this line (fill in today's date):
+"Hey Juli and Cami! 👋 I'm your AI Chief of Staff. Here's today's executive brief | ${today}"
+
+2. Follow with ONE short line summarizing today's biggest themes across all areas (max 20 words).
+
+3. Then select the 3 to 5 most urgent areas. For each area, write EXACTLY this format:
+
+*[Area Name]*
+• 🔴 *At risk:* [One sentence — the most pressing business risk or execution gap. Sound like a leadership risk, not a KR description. Be specific.]
+• 🟡 *Missing:* [One sentence — the most important blind spot, stale signal, missing update, or execution gap. Say what's missing and why it matters.]
+• ❓ *Ask:* [One sharp, decision-useful question the CEO/COO should ask the area owner today.]
+
+Rules:
+- Pick only the most urgent areas. If an area looks fine, skip it.
+- Do NOT list every KR. Synthesize into one crisp sentence per bullet.
+- Sound like an operator, not a consultant. No generic phrases like "ensure alignment" or "drive performance."
+- Confidence score of 1-2 = at risk. Never updated = missing signal. No OKRs = flying blind.
+- Rank areas by urgency — most critical first.
+- If all areas look healthy, say so in one sentence instead of listing areas.
+
+4. End with exactly this line:
+"_Full details + suggested questions → https://ontop-okr-app.vercel.app/executive_"
+
+Output only the Slack message. No preamble, no explanation.`
+
+    const anthropic = new Anthropic()
+    const aiResponse = await anthropic.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 2048,
+      messages: [{ role: 'user', content: prompt }],
+    })
+
+    const message = aiResponse.content[0].type === 'text'
+      ? aiResponse.content[0].text
+      : 'Executive briefing unavailable.'
 
     await postToSlack(message)
+
     return NextResponse.json({
       ok: true,
       areas: reviewLabel,
-      meetings: meetingTitles.filter(t => todayAreas.length > 0),
-      atRisk: atRisk.length,
-      stale: stale.length,
-      missing: missing.length,
+      meetings: meetingTitles,
+      areasAnalyzed: areaInsights.length,
     })
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err)
