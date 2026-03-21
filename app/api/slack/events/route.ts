@@ -182,6 +182,7 @@ ${missingAreas.length > 0 ? missingAreas.map(a => `  - ${a}`).join('\n') : '  No
 
 ## Area OKR Detail
 ${areaDetail}`
+}
 
 // ─── Route handler ────────────────────────────────────────────────────────────
 export async function POST(request: NextRequest) {
