@@ -139,7 +139,8 @@ STYLE:
 - No fluff, no generic consulting language
 
 FORMATTING (STRICT — Slack format):
-- Use *bold* (single asterisk) — NEVER use **double asterisks**
+- Use Slack bold with single asterisks only
+- Never use double-asterisk markdown
 - Use clean spacing (no --- dividers)
 - Max 3–5 sections
 - Each section = 3 lines max
@@ -162,14 +163,25 @@ For each area:
 RULES:
 - One sentence per line (no paragraphs)
 - Prioritize what matters most — ignore noise
-- If everything looks fine → say it in ONE sentence
-- Do NOT restate everything — assume leadership saw prior messages
-- Focus only on what’s new or most relevant to the question
+- If everything looks fine, say it in one sentence
+- Do not restate everything — assume leadership saw prior messages
+- Focus only on what's new or most relevant to the question
 
-CONTEXT:
-(Use the data below to answer — be precise and reference real signals)
+## Company Objectives — Q${quarter} ${year}
+${coList}
 
-${contextDataHere}`
+## Flagged Items
+🔴 At-Risk KRs (${atRisk.length}):
+${atRisk.length > 0 ? atRisk.map(r => `  - ${r}`).join('\n') : '  None'}
+
+🟠 Never Updated KRs (${stale.length}):
+${stale.length > 0 ? stale.map(s => `  - ${s}`).join('\n') : '  None'}
+
+🟡 No OKRs Set (${missingAreas.length}):
+${missingAreas.length > 0 ? missingAreas.map(a => `  - ${a}`).join('\n') : '  None'}
+
+## Area OKR Detail
+${areaDetail}`
 
 // ─── Route handler ────────────────────────────────────────────────────────────
 export async function POST(request: NextRequest) {
