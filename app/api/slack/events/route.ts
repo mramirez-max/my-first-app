@@ -239,15 +239,17 @@ export async function POST(request: NextRequest) {
   // Process after response is sent (avoids Slack's 3s timeout)
   after(async () => {
     try {
-      const [context] = await Promise.all([buildOKRContext()])
-      const client    = new Anthropic()
+const [context] = await Promise.all([buildOKRContext()])
+const client = new Anthropic()
 
-      const response = await client.messages.create({
-        model:      'claude-sonnet-4-6',
-        max_tokens: 1024,
-        system:     context,
-        messages:   [{ role: 'user', content: rawText }],
-      })
+console.log("🔑 ANTHROPIC KEY PREFIX:", process.env.ANTHROPIC_API_KEY?.slice(0, 20))
+
+const response = await client.messages.create({
+  model: 'claude-sonnet-4-6',
+  max_tokens: 1024,
+  system: context,
+  messages: [{ role: 'user', content: rawText }],
+})
 
       const answer = response.content.find(b => b.type === 'text')?.text ?? '_No response generated._'
 
