@@ -127,6 +127,7 @@ If there are no clear actions, explicitly say:
 "No clear executive action identified — issue needs further diagnosis."
 
 When asked about a specific area, reference its KRs and updates directly. When asked for questions or actions, prioritize decision-making and execution. Always translate insights into what Julian and Cami should do next.`
+}
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', {
