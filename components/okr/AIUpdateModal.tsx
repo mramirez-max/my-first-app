@@ -68,9 +68,16 @@ export default function AIUpdateModal({
   // Build a lookup map: KR id → KR details
   const krMap = Object.fromEntries(allKRs.map(kr => [kr.id, kr]))
 
+  const MAX_PDF_MB = 4
+  const MAX_PDF_BYTES = MAX_PDF_MB * 1024 * 1024
+
   function handleFileSelect(file: File) {
     if (file.type !== 'application/pdf') {
       setError('Please upload a PDF file.')
+      return
+    }
+    if (file.size > MAX_PDF_BYTES) {
+      setError(`PDF is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Please use a file under ${MAX_PDF_MB} MB.`)
       return
     }
     setError(null)
@@ -96,13 +103,23 @@ export default function AIUpdateModal({
 
     try {
       const res = await fetch('/api/ai-update', { method: 'POST', body: formData })
-      const data = await res.json()
+
+      if (res.status === 413) {
+        throw new Error(`PDF is too large. Please use a file under ${MAX_PDF_MB} MB.`)
+      }
+
+      let data: { updates?: KRUpdate[]; error?: string }
+      try {
+        data = await res.json()
+      } catch {
+        throw new Error(`Server error (${res.status}). Please try again.`)
+      }
 
       if (!res.ok) {
         throw new Error(data.error ?? 'Failed to generate updates')
       }
 
-      setUpdates(data.updates)
+      setUpdates(data.updates ?? [])
       setStep('preview')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
