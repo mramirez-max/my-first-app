@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/send-slack-insights",
-      "schedule": "0 13 * * *"
+      "schedule": "30 12 * * *"
     }
   ]
 }
