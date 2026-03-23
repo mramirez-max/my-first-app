@@ -166,12 +166,20 @@ You must output TWO sections separated by the exact token THREAD_DETAIL: on its 
 ─────────────────────────────────────
 SECTION 1 — CHANNEL_SUMMARY:
 ─────────────────────────────────────
-Start your output with the literal token CHANNEL_SUMMARY: on its own line, then write a SHORT channel summary (max 5 lines):
+Start your output with the literal token CHANNEL_SUMMARY: on its own line, then write a SHORT channel summary with a BLANK LINE between each element:
 
-• Line 1: "Hey Juli and Cami! 👋 Here's today's exec brief | ${today}"
-• Line 2: ONE sentence on today's biggest theme (max 20 words)
-• Lines 3–5: The 2–3 most critical areas, one line each, format:
-  *[Area]* → [one-sentence risk or gap] → ❓ [the key question]
+Line 1: "Hey Juli and Cami! 👋 Here's today's exec brief | ${today}"
+
+[blank line]
+
+Line 2: ONE sentence on today's biggest theme (max 20 words)
+
+[blank line]
+
+Lines 3–5: The 2–3 most critical areas, one line each WITH a blank line between each, format:
+*[Area]* → [one-sentence risk or gap] → ❓ [the key question]
+
+[blank line between each area bullet]
 
 ─────────────────────────────────────
 SECTION 2 — THREAD_DETAIL:
@@ -213,7 +221,13 @@ RULES (apply to both sections):
 
     // Parse CHANNEL_SUMMARY / THREAD_DETAIL split
     const [summaryPart, detailPart] = raw.split(/^THREAD_DETAIL:\s*/m)
-    const summary = summaryPart.replace(/^CHANNEL_SUMMARY:\s*/m, '').trim()
+    const summaryRaw = summaryPart.replace(/^CHANNEL_SUMMARY:\s*/m, '').trim()
+    // Ensure a blank line between every non-empty line in the summary
+    const summary = summaryRaw
+      .split('\n')
+      .map(l => l.trim())
+      .filter(l => l.length > 0)
+      .join('\n\n')
     const detail  = detailPart?.replace(/---+\n?/g, '').trim()
 
     const dateLabel = new Date().toLocaleDateString('en-US', {
