@@ -17,6 +17,7 @@ import { AreaObjective, calcProgress } from '@/types'
 import { createClient } from '@/lib/supabase/client'
 import { KRInput, KRUpdate } from '@/app/api/ai-update/route'
 import { Upload, FileText, Sparkles, Check, AlertCircle, Loader2 } from 'lucide-react'
+import { upload } from '@vercel/blob/client'  // client-side direct upload, bypasses 4.5 MB serverless limit
 import { cn } from '@/lib/utils'
 
 interface AIUpdateModalProps {
@@ -68,7 +69,7 @@ export default function AIUpdateModal({
   // Build a lookup map: KR id → KR details
   const krMap = Object.fromEntries(allKRs.map(kr => [kr.id, kr]))
 
-  const MAX_PDF_MB = 4
+  const MAX_PDF_MB = 15
   const MAX_PDF_BYTES = MAX_PDF_MB * 1024 * 1024
 
   function handleFileSelect(file: File) {
@@ -96,17 +97,19 @@ export default function AIUpdateModal({
     setStep('generating')
     setError(null)
 
-    const formData = new FormData()
-    formData.append('pdf', pdfFile)
-    formData.append('krs', JSON.stringify(allKRs))
-    formData.append('areaName', areaName)
-
     try {
-      const res = await fetch('/api/ai-update', { method: 'POST', body: formData })
+      // Upload PDF to Vercel Blob (bypasses 4.5 MB serverless limit)
+      const blob = await upload(pdfFile.name, pdfFile, {
+        access: 'public',
+        handleUploadUrl: '/api/upload',
+      })
 
-      if (res.status === 413) {
-        throw new Error(`PDF is too large. Please use a file under ${MAX_PDF_MB} MB.`)
-      }
+      const formData = new FormData()
+      formData.append('blobUrl', blob.url)
+      formData.append('krs', JSON.stringify(allKRs))
+      formData.append('areaName', areaName)
+
+      const res = await fetch('/api/ai-update', { method: 'POST', body: formData })
 
       let data: { updates?: KRUpdate[]; error?: string }
       try {

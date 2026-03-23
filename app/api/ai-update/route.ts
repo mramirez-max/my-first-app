@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { del } from '@vercel/blob'
 
 export const maxDuration = 120 // 2 minutes for large PDFs
 
@@ -23,11 +24,12 @@ export interface KRUpdate {
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData()
-    const pdfFile = formData.get('pdf') as File | null
-    const krsJson = formData.get('krs') as string | null
+    const blobUrl  = formData.get('blobUrl')  as string | null
+    const pdfFile  = formData.get('pdf')      as File   | null
+    const krsJson  = formData.get('krs')      as string | null
     const areaName = formData.get('areaName') as string | null
 
-    if (!pdfFile || !krsJson || !areaName) {
+    if ((!blobUrl && !pdfFile) || !krsJson || !areaName) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
@@ -36,9 +38,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No key results found for this area' }, { status: 400 })
     }
 
-    // Convert PDF to base64
-    const pdfBytes = await pdfFile.arrayBuffer()
-    const pdfBase64 = Buffer.from(pdfBytes).toString('base64')
+    // Fetch PDF bytes — either from Vercel Blob URL or direct upload
+    let pdfBase64: string
+    if (blobUrl) {
+      const blobRes = await fetch(blobUrl)
+      pdfBase64 = Buffer.from(await blobRes.arrayBuffer()).toString('base64')
+    } else {
+      pdfBase64 = Buffer.from(await pdfFile!.arrayBuffer()).toString('base64')
+    }
 
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -150,6 +157,12 @@ Generate one update per KR. Use the exact KR IDs provided.`,
     }
 
     const result = toolUseBlock.input as { updates: KRUpdate[] }
+
+    // Clean up the temporary blob now that we have the result
+    if (blobUrl) {
+      try { await del(blobUrl) } catch { /* non-fatal */ }
+    }
+
     return NextResponse.json({ updates: result.updates })
   } catch (error) {
     console.error('AI update error:', error)
