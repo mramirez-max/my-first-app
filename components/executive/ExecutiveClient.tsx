@@ -300,7 +300,7 @@ export default function ExecutiveClient({
       <div className="flex items-center justify-between gap-4 rounded-xl border border-white/8 bg-white/3 px-5 py-3">
         <div className="flex items-center gap-2 text-sm text-white/60">
           <span>Daily briefing scheduled for</span>
-          <span className="font-medium text-white/80">8:00 AM EST · #cos</span>
+          <span className="font-medium text-white/80">7:30 AM COL · #cos</span>
         </div>
         <div className="flex items-center gap-3">
           {sendError && <p className="text-xs text-red-400">{sendError}</p>}
