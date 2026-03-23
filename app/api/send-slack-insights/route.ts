@@ -6,7 +6,7 @@ import { getTodayMeetingTitles, getAreasForMeetings } from '@/lib/google-calenda
 
 const SLACK_CHANNEL = 'C030BRV0C2G' // #cos
 
-async function postToSlack(message: string) {
+async function postToSlack(message: string, threadTs?: string): Promise<string> {
   const token = process.env.SLACK_BOT_TOKEN
   if (!token) throw new Error('SLACK_BOT_TOKEN is not set')
 
@@ -16,11 +16,11 @@ async function postToSlack(message: string) {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ channel: SLACK_CHANNEL, text: message, mrkdwn: true }),
+    body: JSON.stringify({ channel: SLACK_CHANNEL, text: message, mrkdwn: true, thread_ts: threadTs }),
   })
   const data = await res.json()
   if (!data.ok) throw new Error(`Slack error: ${data.error}`)
-  return data
+  return data.ts as string
 }
 
 export async function POST(request: NextRequest) {
@@ -161,34 +161,44 @@ Here is the raw OKR data for today's areas:
 
 ${areaDataText}
 
-Write a Slack message that reads like a sharp, strategic executive brief — not a database export. Follow these rules exactly:
+You must output TWO sections separated by the exact token THREAD_DETAIL: on its own line.
 
-1. Start with this line (fill in today's date):
-"Hey Juli and Cami! 👋 I'm your AI Chief of Staff. Here's today's executive brief | ${today}"
+─────────────────────────────────────
+SECTION 1 — CHANNEL_SUMMARY:
+─────────────────────────────────────
+Start your output with the literal token CHANNEL_SUMMARY: on its own line, then write a SHORT channel summary (max 5 lines):
 
-2. Follow with ONE short line summarizing today's biggest themes across all areas (max 20 words).
+• Line 1: "Hey Juli and Cami! 👋 Here's today's exec brief | ${today}"
+• Line 2: ONE sentence on today's biggest theme (max 20 words)
+• Lines 3–5: The 2–3 most critical areas, one line each, format:
+  *[Area]* → [one-sentence risk or gap] → ❓ [the key question]
 
-3. Then select the 3 to 5 most urgent areas. For each area, write EXACTLY this format (leave a blank line between areas — no "---" or dividers):
+─────────────────────────────────────
+SECTION 2 — THREAD_DETAIL:
+─────────────────────────────────────
+Then on a new line write the literal token THREAD_DETAIL: and follow with the full per-area breakdown.
+
+For each of the 3–5 most urgent areas write EXACTLY:
 
 *[Area Name]*
-• 🔥 *At risk:* [One sentence — the most pressing business risk or execution gap. Sound like a leadership risk, not a KR description. Be specific. Bold any key metrics, numbers, or critical terms.]
-• 👀 *Missing:* [One sentence — the most important blind spot, stale signal, missing update, or execution gap. Say what's missing and why it matters. Bold any key metrics, numbers, or critical terms.]
-• ❓ *Ask:* [One sharp, decision-useful question the CEO/COO should ask the area owner today.]
 
-Rules:
-- Pick only the most urgent areas. If an area looks fine, skip it.
-- Do NOT list every KR. Synthesize into one crisp sentence per bullet.
-- Sound like an operator, not a consultant. No generic phrases like "ensure alignment" or "drive performance."
-- Confidence score of 1-2 = at risk. Never updated = missing signal. No OKRs = flying blind.
-- Rank areas by urgency — most critical first.
-- Separate areas with a blank line only — never use "---" or any other divider.
-- Bold key metrics, numbers, percentages, account names, or any high-signal facts (use Slack bold: *like this*).
-- If all areas look healthy, say so in one sentence instead of listing areas.
+🔥 *At risk:* [One sentence — most pressing business risk. Bold key metrics.]
+👀 *Missing:* [One sentence — most important blind spot or stale signal. Bold key metrics.]
+❓ *Ask:* [One sharp, decision-useful question for the area owner.]
 
-4. End with exactly this line:
-"_Full details + suggested questions → https://ontop-okr-app.vercel.app/executive_"
+Leave ONE blank line between areas. No "---" dividers.
 
-Output only the Slack message. No preamble, no explanation.`
+End the thread with:
+"_Full details → https://ontop-okr-app.vercel.app/executive_"
+
+─────────────────────────────────────
+RULES (apply to both sections):
+─────────────────────────────────────
+- Sound like a COO/operator — no consulting language
+- Confidence 1–2 = at risk. Never updated = missing signal. No OKRs = flying blind.
+- Bold key metrics, numbers, account names with Slack bold (*like this*)
+- If all areas are healthy, say so in one sentence instead of listing areas
+- Output ONLY the two sections. No preamble, no explanation.`
 
     const anthropic = new Anthropic()
     const aiResponse = await anthropic.messages.create({
@@ -201,12 +211,23 @@ Output only the Slack message. No preamble, no explanation.`
       ? aiResponse.content[0].text
       : 'Executive briefing unavailable.'
 
-    // Enforce double blank line before each area header (*Bold* lines that start a section)
-    const message = raw
-      .replace(/---+\n?/g, '')                          // strip any "---" dividers
-      .replace(/\n(\*[^*\n]+\*\n)/g, '\n\n\n$1')       // double-space before area headers
+    // Parse CHANNEL_SUMMARY / THREAD_DETAIL split
+    const [summaryPart, detailPart] = raw.split(/^THREAD_DETAIL:\s*/m)
+    const summary = summaryPart.replace(/^CHANNEL_SUMMARY:\s*/m, '').trim()
+    const detail  = detailPart?.replace(/---+\n?/g, '').trim()
 
-    await postToSlack(message)
+    const dateLabel = new Date().toLocaleDateString('en-US', {
+      weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/Bogota',
+    })
+
+    if (detail) {
+      // Post short summary to channel, full detail in thread
+      const parentTs = await postToSlack(`*${dateLabel} / OKR Execution Brief* 🧵👇🏼\n\n${summary}`)
+      await postToSlack(detail, parentTs)
+    } else {
+      // Fallback: post full message once (no split found)
+      await postToSlack(summary || raw)
+    }
 
     return NextResponse.json({
       ok: true,
