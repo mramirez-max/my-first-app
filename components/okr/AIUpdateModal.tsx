@@ -98,18 +98,31 @@ export default function AIUpdateModal({
     setError(null)
 
     try {
-      // Upload PDF to Vercel Blob (bypasses 4.5 MB serverless limit)
-      const blob = await upload(pdfFile.name, pdfFile, {
-        access: 'public',
-        handleUploadUrl: '/api/upload',
-      })
+      // Step 1: Upload PDF directly to Vercel Blob (bypasses 4.5 MB serverless limit)
+      console.log('[ai-update] starting blob upload:', pdfFile.name, `${(pdfFile.size / 1024 / 1024).toFixed(2)} MB`)
+      let blob: { url: string }
+      try {
+        blob = await upload(pdfFile.name, pdfFile, {
+          access: 'public',
+          contentType: 'application/pdf',   // must match allowedContentTypes in /api/upload token
+          handleUploadUrl: '/api/upload',
+        })
+        console.log('[ai-update] blob upload complete, URL:', blob.url)
+      } catch (uploadErr) {
+        const msg = uploadErr instanceof Error ? uploadErr.message : String(uploadErr)
+        console.error('[ai-update] blob upload failed:', msg)
+        throw new Error(`File upload failed: ${msg}`)
+      }
 
+      // Step 2: Call AI route with the blob URL
+      console.log('[ai-update] calling /api/ai-update')
       const formData = new FormData()
       formData.append('blobUrl', blob.url)
       formData.append('krs', JSON.stringify(allKRs))
       formData.append('areaName', areaName)
 
       const res = await fetch('/api/ai-update', { method: 'POST', body: formData })
+      console.log('[ai-update] /api/ai-update response status:', res.status)
 
       let data: { updates?: KRUpdate[]; error?: string }
       try {
@@ -125,8 +138,10 @@ export default function AIUpdateModal({
       setUpdates(data.updates ?? [])
       setStep('preview')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong')
-      setStep('upload')
+      const msg = err instanceof Error ? err.message : 'Something went wrong'
+      console.error('[ai-update] handleGenerate error:', msg)
+      setError(msg)
+      setStep('upload')   // always escape the loading state
     }
   }
 

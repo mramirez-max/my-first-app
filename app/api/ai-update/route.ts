@@ -22,6 +22,7 @@ export interface KRUpdate {
 }
 
 export async function POST(request: NextRequest) {
+  console.log('[ai-update] POST received')
   try {
     const formData = await request.formData()
     const blobUrl  = formData.get('blobUrl')  as string | null
@@ -29,7 +30,12 @@ export async function POST(request: NextRequest) {
     const krsJson  = formData.get('krs')      as string | null
     const areaName = formData.get('areaName') as string | null
 
+    console.log('[ai-update] blobUrl:', blobUrl ?? '(none)')
+    console.log('[ai-update] pdfFile:', pdfFile ? `${pdfFile.name} (${pdfFile.size} bytes)` : '(none)')
+    console.log('[ai-update] areaName:', areaName)
+
     if ((!blobUrl && !pdfFile) || !krsJson || !areaName) {
+      console.error('[ai-update] missing required fields')
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
@@ -41,11 +47,20 @@ export async function POST(request: NextRequest) {
     // Fetch PDF bytes — either from Vercel Blob URL or direct upload
     let pdfBase64: string
     if (blobUrl) {
+      console.log('[ai-update] fetching PDF from blob:', blobUrl)
       const blobRes = await fetch(blobUrl)
-      pdfBase64 = Buffer.from(await blobRes.arrayBuffer()).toString('base64')
+      if (!blobRes.ok) {
+        console.error('[ai-update] blob fetch failed:', blobRes.status, blobRes.statusText)
+        throw new Error(`Failed to fetch PDF from storage (${blobRes.status})`)
+      }
+      const bytes = await blobRes.arrayBuffer()
+      console.log('[ai-update] blob fetched, size:', bytes.byteLength, 'bytes')
+      pdfBase64 = Buffer.from(bytes).toString('base64')
     } else {
+      console.log('[ai-update] using direct PDF upload')
       pdfBase64 = Buffer.from(await pdfFile!.arrayBuffer()).toString('base64')
     }
+    console.log('[ai-update] PDF converted to base64, calling Claude')
 
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
