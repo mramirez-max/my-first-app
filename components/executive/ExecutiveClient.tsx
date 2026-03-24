@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Area } from '@/types'
 import { ComputedInsight, AreaInsightData } from '@/components/admin/InsightsPanel'
 import InsightsPanel from '@/components/admin/InsightsPanel'
-import { Loader2, Send, CheckCircle2, Bot, User, Sparkles, BarChart2, History, ArrowLeft, Plus, Trash2 } from 'lucide-react'
+import { Loader2, Send, CheckCircle2, Bot, User, Sparkles, BarChart2, History, ArrowLeft, Plus, Trash2, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import ReactMarkdown from 'react-markdown'
 
@@ -165,6 +165,7 @@ export default function ExecutiveClient({
 
   const [showHistory, setShowHistory]   = useState(false)
   const [savedSessions, setSavedSessions] = useState<SavedSession[]>([])
+  const [selectedIds, setSelectedIds]   = useState<Set<string>>(new Set())
 
   const messagesEndRef  = useRef<HTMLDivElement>(null)
   const inputRef        = useRef<HTMLTextAreaElement>(null)
@@ -221,6 +222,81 @@ export default function ExecutiveClient({
     const updated = savedSessions.filter(s => s.id !== id)
     setSavedSessions(updated)
     localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(updated))
+  }
+
+  function toggleSelect(id: string, e: React.MouseEvent) {
+    e.stopPropagation()
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  function exportToPDF() {
+    const sessions = savedSessions.filter(s => selectedIds.has(s.id))
+    if (sessions.length === 0) return
+
+    const escapeHtml = (s: string) =>
+      s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+    const sessionHtml = sessions.map(session => {
+      const date = new Date(session.savedAt).toLocaleString('en-US', {
+        dateStyle: 'medium', timeStyle: 'short',
+      })
+      const messages = session.messages.map(m => `
+        <div class="msg ${m.role}">
+          <div class="label">${m.role === 'user' ? 'You' : 'AI Chief of Staff'}</div>
+          <div class="body">${escapeHtml(m.content).replace(/\n/g, '<br>')}</div>
+        </div>`).join('')
+      return `
+        <div class="session">
+          <div class="session-header">
+            <span class="session-title">${escapeHtml(session.preview || 'Conversation')}</span>
+            <span class="session-date">${date} · ${session.messages.length} messages</span>
+          </div>
+          ${messages}
+        </div>`
+    }).join('<div class="divider"></div>')
+
+    const win = window.open('', '_blank')
+    if (!win) return
+    win.document.write(`<!DOCTYPE html><html><head>
+      <meta charset="utf-8">
+      <title>AI Chief of Staff — Chat Export</title>
+      <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+               font-size: 14px; color: #111; background: #fff;
+               max-width: 780px; margin: 0 auto; padding: 40px 32px; }
+        h1 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+        .meta { font-size: 12px; color: #888; margin-bottom: 32px; }
+        .session { margin-bottom: 40px; }
+        .session-header { margin-bottom: 16px; }
+        .session-title { display: block; font-size: 15px; font-weight: 600; color: #111; }
+        .session-date { display: block; font-size: 11px; color: #999; margin-top: 2px; }
+        .msg { margin-bottom: 14px; }
+        .label { font-size: 11px; font-weight: 600; text-transform: uppercase;
+                 letter-spacing: .05em; margin-bottom: 4px; color: #888; }
+        .msg.user .label { color: #4A268C; }
+        .msg.assistant .label { color: #c0392b; }
+        .body { line-height: 1.6; color: #222; white-space: pre-wrap; }
+        .msg.user .body { background: #f5f3ff; border-radius: 8px; padding: 10px 14px; }
+        .msg.assistant .body { background: #fff8f8; border-radius: 8px; padding: 10px 14px; }
+        .divider { border-top: 2px dashed #e5e5e5; margin: 40px 0; }
+        .print-btn { display: block; margin: 0 auto 32px;
+                     padding: 10px 24px; background: #4A268C; color: #fff;
+                     border: none; border-radius: 8px; font-size: 14px;
+                     font-weight: 600; cursor: pointer; }
+        @media print { .print-btn { display: none; } }
+      </style>
+    </head><body>
+      <button class="print-btn" onclick="window.print()">⬇ Save as PDF</button>
+      <h1>AI Chief of Staff — Chat Export</h1>
+      <p class="meta">Exported ${new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })} · ${sessions.length} conversation${sessions.length !== 1 ? 's' : ''}</p>
+      ${sessionHtml}
+    </body></html>`)
+    win.document.close()
   }
 
   async function sendToSlack() {
@@ -375,38 +451,60 @@ export default function ExecutiveClient({
           {/* History panel (replaces messages when open) */}
           {showHistory ? (
             <div className="px-5 py-4 min-h-[200px] max-h-[520px] overflow-y-auto space-y-3">
-              <div className="flex items-center gap-2 mb-4">
-                <button onClick={() => setShowHistory(false)}
+              <div className="flex items-center justify-between mb-4">
+                <button onClick={() => { setShowHistory(false); setSelectedIds(new Set()) }}
                   className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white/70 transition-colors">
                   <ArrowLeft size={13} /> Back to chat
                 </button>
+                {selectedIds.size > 0 && (
+                  <button onClick={exportToPDF}
+                    className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[#FF5A70]/15 text-[#FF5A70] hover:bg-[#FF5A70]/25 transition-colors font-medium">
+                    <Download size={12} /> Export {selectedIds.size} as PDF
+                  </button>
+                )}
               </div>
 
               {savedSessions.length === 0 ? (
                 <p className="text-sm text-white/30 italic">No past conversations yet.</p>
               ) : (
-                savedSessions.map(session => (
-                  <div key={session.id}
-                    className="w-full text-left rounded-xl border border-white/8 bg-white/3 hover:bg-white/6 hover:border-white/15 transition-all group relative">
-                    <button onClick={() => loadSession(session)} className="w-full text-left px-4 py-3 pr-10">
-                      <div className="flex items-start justify-between gap-3">
-                        <p className="text-sm text-white/75 group-hover:text-white transition-colors line-clamp-2 flex-1">
-                          {session.preview || '(no preview)'}
+                savedSessions.map(session => {
+                  const isSelected = selectedIds.has(session.id)
+                  return (
+                    <div key={session.id}
+                      className={cn(
+                        'w-full text-left rounded-xl border bg-white/3 hover:bg-white/6 transition-all group relative',
+                        isSelected ? 'border-[#FF5A70]/50 bg-[#FF5A70]/5' : 'border-white/8 hover:border-white/15',
+                      )}>
+                      {/* Checkbox */}
+                      <button onClick={(e) => toggleSelect(session.id, e)}
+                        className={cn(
+                          'absolute top-3 left-3 w-4 h-4 rounded border flex items-center justify-center transition-colors',
+                          isSelected
+                            ? 'bg-[#FF5A70] border-[#FF5A70]'
+                            : 'border-white/20 bg-white/5 opacity-0 group-hover:opacity-100',
+                        )}>
+                        {isSelected && <span className="text-white text-[9px] font-bold leading-none">✓</span>}
+                      </button>
+                      <button onClick={() => loadSession(session)} className="w-full text-left pl-9 pr-10 py-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="text-sm text-white/75 group-hover:text-white transition-colors line-clamp-2 flex-1">
+                            {session.preview || '(no preview)'}
+                          </p>
+                          <span className="text-xs text-white/25 whitespace-nowrap mt-0.5">
+                            {formatDate(session.savedAt)}
+                          </span>
+                        </div>
+                        <p className="text-xs text-white/25 mt-1">
+                          {session.messages.length} message{session.messages.length !== 1 ? 's' : ''}
                         </p>
-                        <span className="text-xs text-white/25 whitespace-nowrap mt-0.5">
-                          {formatDate(session.savedAt)}
-                        </span>
-                      </div>
-                      <p className="text-xs text-white/25 mt-1">
-                        {session.messages.length} message{session.messages.length !== 1 ? 's' : ''}
-                      </p>
-                    </button>
-                    <button onClick={(e) => deleteSession(session.id, e)}
-                      className="absolute top-3 right-3 p-1.5 rounded-lg text-white/20 hover:text-red-400 hover:bg-red-400/10 transition-colors opacity-0 group-hover:opacity-100">
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
-                ))
+                      </button>
+                      <button onClick={(e) => deleteSession(session.id, e)}
+                        className="absolute top-3 right-3 p-1.5 rounded-lg text-white/20 hover:text-red-400 hover:bg-red-400/10 transition-colors opacity-0 group-hover:opacity-100">
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  )
+                })
               )}
             </div>
           ) : (
