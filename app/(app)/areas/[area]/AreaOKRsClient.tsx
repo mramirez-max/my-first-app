@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Area, AreaObjective, CompanyObjective, Profile } from '@/types'
 import OKRCard from '@/components/okr/OKRCard'
 import { Button } from '@/components/ui/button'
-import { PlusCircle, Sparkles, Wand2, AlertCircle } from 'lucide-react'
+import { PlusCircle, Sparkles, Wand2, AlertCircle, Download } from 'lucide-react'
 import ObjectiveDialog from '@/components/okr/ObjectiveDialog'
 import AIUpdateModal from '@/components/okr/AIUpdateModal'
 import AISetupModal from '@/components/okr/AISetupModal'
@@ -38,6 +38,159 @@ export default function AreaOKRsClient({
     router.refresh()
   }
 
+  async function downloadTemplate() {
+    const { Document, Packer, Paragraph, TextRun } = await import('docx')
+
+    const LINE = '_______________________________________________'
+    const LONG_LINE = '________________________________________________________________'
+
+    const children: InstanceType<typeof Paragraph>[] = []
+
+    const gap = (after = 160) => new Paragraph({ children: [new TextRun('')], spacing: { after } })
+    const rule = () => new Paragraph({
+      children: [new TextRun({ text: '─'.repeat(68), color: 'CCCCCC', size: 18 })],
+      spacing: { before: 80, after: 200 },
+    })
+
+    // ── Header ──────────────────────────────────────────────
+    children.push(new Paragraph({
+      children: [new TextRun({ text: `${area.name}`, bold: true, size: 52, color: '1a1040' })],
+      spacing: { after: 60 },
+    }))
+    children.push(new Paragraph({
+      children: [new TextRun({ text: `Weekly OKR Update  ·  Q${quarter} ${year}`, size: 26, color: '888888' })],
+      spacing: { after: 280 },
+    }))
+
+    // ── Fill-in header fields ────────────────────────────────
+    children.push(new Paragraph({
+      children: [
+        new TextRun({ text: 'Week of:        ', bold: true, size: 22 }),
+        new TextRun({ text: LINE, size: 22, color: 'AAAAAA' }),
+      ],
+      spacing: { after: 120 },
+    }))
+    children.push(new Paragraph({
+      children: [
+        new TextRun({ text: 'Reported by:  ', bold: true, size: 22 }),
+        new TextRun({ text: LINE, size: 22, color: 'AAAAAA' }),
+      ],
+      spacing: { after: 320 },
+    }))
+
+    // ── Instructions ─────────────────────────────────────────
+    children.push(new Paragraph({
+      children: [new TextRun({
+        text: 'Instructions: Fill in every section below. Confidence score: 1 = Off track  |  2 = At risk  |  3 = Cautious  |  4 = Good  |  5 = On track. When done, save as PDF and upload via "AI Weekly Update" in the app.',
+        italics: true, size: 18, color: '777777',
+      })],
+      spacing: { after: 320 },
+    }))
+
+    children.push(rule())
+
+    // ── Objectives & KRs ─────────────────────────────────────
+    objectives.forEach((obj, objIdx) => {
+      children.push(new Paragraph({
+        children: [new TextRun({
+          text: `OBJECTIVE ${objIdx + 1}:  ${obj.title}`,
+          bold: true, size: 30, color: '1a1040',
+        })],
+        spacing: { before: 160, after: 100 },
+      }))
+
+      if (obj.aligned_objective?.title) {
+        children.push(new Paragraph({
+          children: [new TextRun({
+            text: `↳ Aligned to company objective: ${obj.aligned_objective.title}`,
+            italics: true, size: 19, color: 'FF5A70',
+          })],
+          spacing: { after: 200 },
+        }))
+      }
+
+      const krs = obj.key_results ?? []
+      krs.forEach((kr, krIdx) => {
+        const unitStr = kr.unit ? ` ${kr.unit}` : ''
+
+        children.push(new Paragraph({
+          children: [new TextRun({
+            text: `KR ${objIdx + 1}.${krIdx + 1}  —  ${kr.description}`,
+            bold: true, size: 23,
+          })],
+          spacing: { before: 240, after: 140 },
+        }))
+
+        // Current value
+        children.push(new Paragraph({
+          children: [
+            new TextRun({ text: 'Current value:', bold: true, size: 21 }),
+            new TextRun({ text: `   ________   /  ${kr.target_value}${unitStr}`, size: 21 }),
+          ],
+          spacing: { after: 100 },
+        }))
+
+        // Confidence
+        children.push(new Paragraph({
+          children: [
+            new TextRun({ text: 'Confidence (1–5):', bold: true, size: 21 }),
+            new TextRun({ text: '   ________', size: 21 }),
+          ],
+          spacing: { after: 180 },
+        }))
+
+        // Weekly update
+        children.push(new Paragraph({
+          children: [new TextRun({ text: 'What happened this week? (2–4 sentences)', bold: true, size: 21 })],
+          spacing: { after: 80 },
+        }))
+        children.push(new Paragraph({
+          children: [new TextRun({ text: LONG_LINE, size: 21, color: 'CCCCCC' })],
+          spacing: { after: 80 },
+        }))
+        children.push(new Paragraph({
+          children: [new TextRun({ text: LONG_LINE, size: 21, color: 'CCCCCC' })],
+          spacing: { after: 80 },
+        }))
+        children.push(new Paragraph({
+          children: [new TextRun({ text: LONG_LINE, size: 21, color: 'CCCCCC' })],
+          spacing: { after: 160 },
+        }))
+
+        // Blockers
+        children.push(new Paragraph({
+          children: [new TextRun({ text: 'Key blockers or dependencies', bold: true, size: 21 })],
+          spacing: { after: 80 },
+        }))
+        children.push(new Paragraph({
+          children: [new TextRun({ text: LONG_LINE, size: 21, color: 'CCCCCC' })],
+          spacing: { after: 80 },
+        }))
+        children.push(gap(200))
+      })
+
+      if (objIdx < objectives.length - 1) children.push(rule())
+    })
+
+    // ── Footer ───────────────────────────────────────────────
+    children.push(rule())
+    children.push(new Paragraph({
+      children: [new TextRun({
+        text: `Generated by Ontop OKR System  ·  Q${quarter} ${year}  ·  ${area.name}`,
+        size: 16, color: 'BBBBBB', italics: true,
+      })],
+    }))
+
+    const doc = new Document({ sections: [{ children }] })
+    const blob = await Packer.toBlob(doc)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${area.name.replace(/ /g, '-')}-OKR-Template-Q${quarter}-${year}.docx`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   const canAddObjective = isCurrentQuarter && (
     profile?.role === 'admin' ||
     (profile?.role === 'area_lead' && profile.area_id === area.id)
@@ -64,8 +217,18 @@ export default function AreaOKRsClient({
       )}
 
       {/* Action buttons row */}
-      {(canAddObjective || (canUpdate && hasKRs)) && (
+      {(canAddObjective || hasKRs) && (
         <div className="flex items-center justify-end gap-2">
+          {hasKRs && (
+            <Button
+              variant="outline"
+              onClick={downloadTemplate}
+              className="gap-2 border-white/15 text-white/70 hover:bg-white/5 hover:text-white"
+            >
+              <Download size={15} />
+              Download Template
+            </Button>
+          )}
           {canAddObjective && (
             <Button
               onClick={() => setShowAISetupModal(true)}
