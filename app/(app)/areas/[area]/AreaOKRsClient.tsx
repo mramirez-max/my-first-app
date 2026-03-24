@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Area, AreaObjective, CompanyObjective, Profile } from '@/types'
 import OKRCard from '@/components/okr/OKRCard'
 import { Button } from '@/components/ui/button'
-import { PlusCircle, Sparkles, Wand2, AlertCircle, Download } from 'lucide-react'
+import { PlusCircle, Sparkles, Wand2, AlertCircle, FileSpreadsheet } from 'lucide-react'
 import ObjectiveDialog from '@/components/okr/ObjectiveDialog'
 import AIUpdateModal from '@/components/okr/AIUpdateModal'
 import AISetupModal from '@/components/okr/AISetupModal'
@@ -39,310 +39,55 @@ export default function AreaOKRsClient({
   }
 
   async function downloadTemplate() {
-    const {
-      Document, Packer, Paragraph, TextRun,
-      Table, TableRow, TableCell,
-      WidthType, BorderStyle, AlignmentType,
-    } = await import('docx')
+    const XLSX = await import('xlsx')
 
-    const F = 'Poppins'
-    const RED    = 'FF5A70'
-    const PURPLE = '4A268C'
-    const DARK   = '1A1040'
-    const MID    = '6B7280'
-    const MUTED  = 'AAAAAA'
-    const RULE   = 'E5E7EB'
-    const PILL_BG = 'FFF1F3'   // light pink for objective pill
-    const KR_BG   = 'F9F8FF'   // very light purple for KR block
+    // Header row
+    const headers = [
+      'Objective',
+      'Key Result',
+      'Target',
+      'Current Value',
+      'Confidence (1–5)',
+      'What happened this week?',
+      'Blockers / Dependencies',
+    ]
 
-    // ── Helpers ──────────────────────────────────────────────
-
-    // Invisible border (removes default table cell borders)
-    const noBorder = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
-    const noBorders = { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder }
-
-    // Thin bottom border for fill-in lines
-    const fillBorder = { bottom: { style: BorderStyle.SINGLE, size: 6, color: 'D1D5DB' }, top: noBorder, left: noBorder, right: noBorder }
-
-    // Empty spacer paragraph
-    const sp = (after = 160) => new Paragraph({ children: [new TextRun({ text: ' ', font: F, size: 18 })], spacing: { after } })
-
-    // Thin full-width rule
-    const hr = (color = RULE, after = 240) => new Paragraph({
-      border: { bottom: { style: BorderStyle.SINGLE, size: 4, color } },
-      children: [new TextRun({ text: ' ', font: F, size: 4 })],
-      spacing: { after },
-    })
-
-    // Label above a fill-in line
-    const fieldLabel = (text: string) => new Paragraph({
-      children: [new TextRun({ text, font: F, size: 17, color: MID, bold: true, allCaps: true })],
-      spacing: { before: 160, after: 60 },
-    })
-
-    // Actual fill-in line (bottom border)
-    const fieldLine = () => new Paragraph({
-      children: [new TextRun({ text: ' ', font: F, size: 24 })],
-      border: fillBorder,
-      spacing: { after: 0 },
-    })
-
-    // Section label (e.g. "WHAT HAPPENED THIS WEEK")
-    const sectionLabel = (text: string, after = 80) => new Paragraph({
-      children: [new TextRun({ text, font: F, size: 17, color: MID, bold: true, allCaps: true })],
-      spacing: { before: 200, after },
-    })
-
-    // Multiple fill-in lines
-    const fillLines = (count: number, after = 120) =>
-      Array.from({ length: count }, (_, i) => new Paragraph({
-        children: [new TextRun({ text: ' ', font: F, size: 26 })],
-        border: fillBorder,
-        spacing: { after: i < count - 1 ? 100 : after },
-      }))
-
-    // ── Build document ───────────────────────────────────────
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const children: any[] = []
-
-    // ── HEADER ───────────────────────────────────────────────
-    children.push(new Paragraph({
-      children: [
-        new TextRun({ text: area.name, font: F, size: 56, bold: true, color: DARK }),
-      ],
-      spacing: { after: 80 },
-    }))
-    children.push(new Paragraph({
-      children: [
-        new TextRun({ text: 'Weekly OKR Update', font: F, size: 26, color: RED }),
-        new TextRun({ text: `   ·   Q${quarter} ${year}`, font: F, size: 26, color: MUTED }),
-      ],
-      spacing: { after: 320 },
-    }))
-
-    // ── META FIELDS (two-column table) ───────────────────────
-    children.push(new Table({
-      width: { size: 100, type: WidthType.PERCENTAGE },
-      layout: 'fixed' as never,
-      rows: [
-        new TableRow({
-          children: [
-            new TableCell({
-              width: { size: 50, type: WidthType.PERCENTAGE },
-              borders: noBorders,
-              margins: { right: 400 },
-              children: [
-                fieldLabel('Week of'),
-                fieldLine(),
-              ],
-            }),
-            new TableCell({
-              width: { size: 50, type: WidthType.PERCENTAGE },
-              borders: noBorders,
-              children: [
-                fieldLabel('Reported by'),
-                fieldLine(),
-              ],
-            }),
-          ],
-        }),
-      ],
-    }))
-
-    children.push(sp(320))
-    children.push(hr(RULE, 320))
-
-    // ── INSTRUCTIONS ─────────────────────────────────────────
-    children.push(new Paragraph({
-      children: [
-        new TextRun({ text: 'How to fill this in: ', font: F, size: 18, bold: true, color: PURPLE }),
-        new TextRun({
-          text: 'Complete every field for each key result. For confidence, use: 1 = Off track  ·  2 = At risk  ·  3 = Cautious  ·  4 = Good  ·  5 = On track. Save as PDF when done and upload via ',
-          font: F, size: 18, color: MID,
-        }),
-        new TextRun({ text: 'AI Weekly Update', font: F, size: 18, bold: true, color: PURPLE }),
-        new TextRun({ text: ' in the app.', font: F, size: 18, color: MID }),
-      ],
-      spacing: { after: 400 },
-    }))
-
-    // ── OBJECTIVES & KRs ─────────────────────────────────────
-    objectives.forEach((obj, objIdx) => {
-
-      // Objective pill header
-      children.push(new Paragraph({
-        children: [
-          new TextRun({ text: `OBJECTIVE ${objIdx + 1}`, font: F, size: 17, bold: true, color: RED, allCaps: true }),
-          new TextRun({ text: '   ', font: F, size: 17 }),
-        ],
-        spacing: { before: 80, after: 100 },
-        shading: { type: 'clear' as never, fill: PILL_BG },
-        border: {
-          left: { style: BorderStyle.SINGLE, size: 16, color: RED },
-          top: noBorder, bottom: noBorder, right: noBorder,
-        },
-        indent: { left: 160 },
-      }))
-      children.push(new Paragraph({
-        children: [new TextRun({ text: obj.title, font: F, size: 28, bold: true, color: DARK })],
-        indent: { left: 180 },
-        spacing: { after: 80 },
-        shading: { type: 'clear' as never, fill: PILL_BG },
-        border: {
-          left: { style: BorderStyle.SINGLE, size: 16, color: RED },
-          top: noBorder, bottom: noBorder, right: noBorder,
-        },
-      }))
-
-      if (obj.aligned_objective?.title) {
-        children.push(new Paragraph({
-          children: [
-            new TextRun({ text: '↳ Aligned to: ', font: F, size: 18, color: MUTED }),
-            new TextRun({ text: obj.aligned_objective.title, font: F, size: 18, color: PURPLE, italics: true }),
-          ],
-          indent: { left: 180 },
-          spacing: { before: 60, after: 0 },
-          shading: { type: 'clear' as never, fill: PILL_BG },
-          border: {
-            left: { style: BorderStyle.SINGLE, size: 16, color: RED },
-            top: noBorder, bottom: noBorder, right: noBorder,
-          },
-        }))
-      }
-
-      children.push(sp(240))
-
+    // One row per KR
+    const rows: string[][] = []
+    objectives.forEach(obj => {
       const krs = obj.key_results ?? []
-      krs.forEach((kr, krIdx) => {
+      krs.forEach(kr => {
         const unitStr = kr.unit ? ` ${kr.unit}` : ''
-
-        // KR number badge + description
-        children.push(new Paragraph({
-          children: [
-            new TextRun({ text: `KR ${objIdx + 1}.${krIdx + 1}`, font: F, size: 18, bold: true, color: PURPLE, allCaps: true }),
-          ],
-          spacing: { before: 80, after: 60 },
-          shading: { type: 'clear' as never, fill: KR_BG },
-          border: {
-            left: { style: BorderStyle.SINGLE, size: 10, color: PURPLE },
-            top: noBorder, bottom: noBorder, right: noBorder,
-          },
-          indent: { left: 160 },
-        }))
-        children.push(new Paragraph({
-          children: [new TextRun({ text: kr.description, font: F, size: 23, bold: true, color: DARK })],
-          indent: { left: 180 },
-          shading: { type: 'clear' as never, fill: KR_BG },
-          border: {
-            left: { style: BorderStyle.SINGLE, size: 10, color: PURPLE },
-            top: noBorder, bottom: noBorder, right: noBorder,
-          },
-          spacing: { after: 60 },
-        }))
-        children.push(new Paragraph({
-          children: [new TextRun({ text: `Target: ${kr.target_value}${unitStr}`, font: F, size: 18, color: MUTED })],
-          indent: { left: 180 },
-          shading: { type: 'clear' as never, fill: KR_BG },
-          border: {
-            left: { style: BorderStyle.SINGLE, size: 10, color: PURPLE },
-            top: noBorder, bottom: noBorder, right: noBorder,
-          },
-          spacing: { after: 0 },
-        }))
-
-        children.push(sp(200))
-
-        // Current value + Confidence (two-column)
-        children.push(new Table({
-          width: { size: 100, type: WidthType.PERCENTAGE },
-          layout: 'fixed' as never,
-          rows: [
-            new TableRow({
-              children: [
-                new TableCell({
-                  width: { size: 50, type: WidthType.PERCENTAGE },
-                  borders: noBorders,
-                  margins: { right: 400 },
-                  children: [
-                    fieldLabel(`Current value  /  target: ${kr.target_value}${unitStr}`),
-                    fieldLine(),
-                  ],
-                }),
-                new TableCell({
-                  width: { size: 50, type: WidthType.PERCENTAGE },
-                  borders: noBorders,
-                  children: [
-                    fieldLabel('Confidence score (1 – 5)'),
-                    fieldLine(),
-                  ],
-                }),
-              ],
-            }),
-          ],
-        }))
-
-        children.push(sp(80))
-
-        // Confidence legend
-        children.push(new Paragraph({
-          children: [new TextRun({
-            text: '1 = Off track   ·   2 = At risk   ·   3 = Cautious   ·   4 = Good   ·   5 = On track',
-            font: F, size: 16, color: MUTED, italics: true,
-          })],
-          spacing: { after: 40 },
-          alignment: AlignmentType.CENTER,
-        }))
-
-        children.push(sp(80))
-
-        // Weekly update
-        children.push(sectionLabel('What happened this week? (2–4 sentences)'))
-        children.push(...fillLines(3, 160))
-
-        // Blockers
-        children.push(sectionLabel('Key blockers or dependencies'))
-        children.push(...fillLines(2, 60))
-
-        children.push(sp(280))
-        children.push(hr('E5E7EB', 280))
+        rows.push([
+          obj.title,
+          kr.description,
+          `${kr.target_value}${unitStr}`,
+          '',  // Current Value — to be filled
+          '',  // Confidence — to be filled
+          '',  // What happened — to be filled
+          '',  // Blockers — to be filled
+        ])
       })
     })
 
-    // ── FOOTER ───────────────────────────────────────────────
-    children.push(new Paragraph({
-      children: [new TextRun({
-        text: `Ontop OKR System  ·  ${area.name}  ·  Q${quarter} ${year}`,
-        font: F, size: 16, color: MUTED, italics: true,
-      })],
-      alignment: AlignmentType.CENTER,
-      spacing: { before: 160 },
-    }))
+    const wsData = [headers, ...rows]
+    const ws = XLSX.utils.aoa_to_sheet(wsData)
 
-    const doc = new Document({
-      styles: {
-        default: {
-          document: {
-            run: { font: F, size: 22, color: DARK },
-          },
-        },
-      },
-      sections: [{
-        properties: {
-          page: {
-            margin: { top: 800, bottom: 800, left: 900, right: 900 },
-          },
-        },
-        children,
-      }],
-    })
+    // Column widths
+    ws['!cols'] = [
+      { wch: 40 }, // Objective
+      { wch: 45 }, // Key Result
+      { wch: 16 }, // Target
+      { wch: 18 }, // Current Value
+      { wch: 20 }, // Confidence
+      { wch: 45 }, // What happened
+      { wch: 35 }, // Blockers
+    ]
 
-    const blob = await Packer.toBlob(doc)
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${area.name.replace(/ /g, '-')}-OKR-Template-Q${quarter}-${year}.docx`
-    a.click()
-    URL.revokeObjectURL(url)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, `Q${quarter} ${year}`)
+
+    XLSX.writeFile(wb, `${area.name.replace(/ /g, '-')}-OKR-Template-Q${quarter}-${year}.xlsx`)
   }
 
   const canAddObjective = isCurrentQuarter && (
@@ -379,7 +124,7 @@ export default function AreaOKRsClient({
               onClick={downloadTemplate}
               className="gap-2 border-white/15 text-white/70 hover:bg-white/5 hover:text-white"
             >
-              <Download size={15} />
+              <FileSpreadsheet size={15} />
               Download Template
             </Button>
           )}

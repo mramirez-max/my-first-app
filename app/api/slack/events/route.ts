@@ -5,10 +5,10 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentQuarter } from '@/types'
 import { getTodayMeetingTitles, getAreasForMeetings } from '@/lib/google-calendar'
 
-// ─── Deduplication (in-memory, sufficient for serverless retries) ─────────────
+// --- Deduplication (in-memory, sufficient for serverless retries) -------------
 const processedEvents = new Set<string>()
 
-// ─── Slack signature verification ────────────────────────────────────────────
+// --- Slack signature verification --------------------------------------------
 function verifySlackSignature(req: NextRequest, rawBody: string): boolean {
   const secret    = process.env.SLACK_SIGNING_SECRET
   const timestamp = req.headers.get('x-slack-request-timestamp')
@@ -29,7 +29,7 @@ function verifySlackSignature(req: NextRequest, rawBody: string): boolean {
   }
 }
 
-// ─── Slack API helpers ────────────────────────────────────────────────────────
+// --- Slack API helpers -------------------------------------------------------
 const SLACK_API = 'https://slack.com/api'
 
 async function slackPost(channel: string, text: string, threadTs?: string): Promise<string | null> {
@@ -54,10 +54,10 @@ async function slackUpdate(channel: string, ts: string, text: string) {
   })
 }
 
-// ─── OKR context fetcher ──────────────────────────────────────────────────────
+// --- OKR context fetcher -----------------------------------------------------
 async function buildOKRContext(): Promise<string> {
-  const supabase            = createAdminClient()
-  const { quarter, year }   = getCurrentQuarter()
+  const supabase          = createAdminClient()
+  const { quarter, year } = getCurrentQuarter()
 
   const [
     { data: areas },
@@ -89,12 +89,12 @@ async function buildOKRContext(): Promise<string> {
   for (const obj of (areaObjectives ?? []) as unknown as ObjRow[]) {
     const area = getAreaName(obj)
     for (const kr of getKRs(obj)) {
-      const sorted  = (kr.updates ?? []).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-      const latest  = sorted[0]
+      const sorted = (kr.updates ?? []).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      const latest = sorted[0]
       if (!latest) {
         stale.push(`${area}: "${kr.description}"`)
       } else if (latest.confidence_score <= 2) {
-        atRisk.push(`${area}: "${kr.description}" (confidence ${latest.confidence_score}/5 — ${latest.update_text?.slice(0, 120) ?? 'no note'})`)
+        atRisk.push(`${area}: "${kr.description}" (confidence ${latest.confidence_score}/5 -- ${latest.update_text?.slice(0, 120) ?? 'no note'})`)
       }
     }
   }
@@ -105,12 +105,12 @@ async function buildOKRContext(): Promise<string> {
     const name = getAreaName(o)
     if (!acc[name]) acc[name] = []
     for (const kr of getKRs(o)) {
-      const sorted  = (kr.updates ?? []).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-      const latest  = sorted[0]
-      const status  = latest
-        ? `confidence ${latest.confidence_score}/5 — "${latest.update_text?.slice(0, 100) ?? ''}"`
+      const sorted = (kr.updates ?? []).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      const latest = sorted[0]
+      const status = latest
+        ? `confidence ${latest.confidence_score}/5 -- "${latest.update_text?.slice(0, 100) ?? ''}"`
         : 'never updated'
-      acc[name].push(`  • ${kr.description} [${status}]`)
+      acc[name].push(`  - ${kr.description} [${status}]`)
     }
     return acc
   }, {})
@@ -118,7 +118,7 @@ async function buildOKRContext(): Promise<string> {
   // Calendar context
   let calendarLine = ''
   try {
-    const titles   = await getTodayMeetingTitles()
+    const titles     = await getTodayMeetingTitles()
     const todayAreas = getAreasForMeetings(titles)
     if (todayAreas.length > 0) calendarLine = `\nToday's scheduled reviews: ${todayAreas.join(', ')}`
   } catch { /* calendar optional */ }
@@ -129,134 +129,46 @@ async function buildOKRContext(): Promise<string> {
     .map(([name, krs]) => `*${name}*\n${krs.join('\n')}`)
     .join('\n\n') || '(No area OKRs set this quarter.)'
 
-return `
-You are the AI Chief of Staff for Ontop.
+  const atRiskSection = atRisk.length === 0
+    ? 'At-Risk KRs (confidence <=2): None'
+    : `At-Risk KRs (confidence <=2):\n${atRisk.map(r => `  - ${r}`).join('\n')}`
 
-You support leadership (CEO, COO) with sharp, decision-oriented insights on company execution, OKRs, risks, and performance.
+  const staleSection = stale.length === 0
+    ? 'Never Updated KRs: None'
+    : `Never Updated KRs:\n${stale.map(s => `  - ${s}`).join('\n')}`
 
-You are not an analyst. You are an operator.
+  const missingSection = missingAreas.length === 0
+    ? 'No OKRs Set: None'
+    : `No OKRs Set: ${missingAreas.join(', ')}`
 
----
+  return `You are the AI Chief of Staff for Ontop. Blunt, direct, no fluff.
 
-STYLE:
-
-- Sound like a COO / Chief of Staff, not a consultant
-- Be direct, concise, and slightly opinionated
-- No fluff, no generic language
-- Prioritize clarity over completeness
-- Focus on what matters most
-
----
-
-FORMATTING (STRICT — MUST FOLLOW):
-
-- NO tables (never use | or markdown grids)
-- NO long paragraphs
-- Use clean spacing between sections
-- Use Slack-style formatting:
-  - *bold* with single asterisks only
-- Max 4–6 sections
-- Max ~12–15 lines total
-- One idea per line
-
----
-
-STRUCTURE (MANDATORY):
-
-When summarizing multiple areas, ALWAYS use:
-
-*<Section Title>*
-
-Area — Severity  
-→ One-line diagnosis (what is happening + why it matters)
-
-Example:
-
-Revenue — 🔴 Critical  
-→ Pipeline and deal size collapse — Q1 target at risk  
-
-Customer Success — 🔴 Critical  
-→ Churn firefighting consuming all team capacity  
-
----
-
-BOTTOM LINE FORMAT (MANDATORY when summarizing):
-
-Start with:
-
-*Bottom Line for Julian & Cami*
-
-Then:
-
-Area — Severity  
-→ Root cause
-
----
+Answer the question asked. Nothing more.
 
 RULES:
+- Max 5 lines. If the answer fits in 1-2 lines, do that.
+- Slack format: *bold* with asterisks, no tables, no markdown headers
+- No greetings, no sign-offs, no preamble
+- If data is missing or unclear, say so in one sentence
+- Numbers and specifics over vague statements
+- If everything is fine, say it in one sentence${calendarLine}
 
-- Do not restate all data — assume leadership already saw dashboards
-- Highlight only what is new, critical, or misaligned
-- If something is unclear or missing, say it explicitly
-- If everything is fine, say it in one sentence
-- Avoid repeating the same insight in different words
+Q${quarter} ${year} OKR DATA:
 
----
-
-TONE CALIBRATION:
-
-Bad:
-"Performance appears to be under target due to multiple contributing factors..."
-
-Good:
-"Pipeline is too small. Even perfect execution won’t hit target."
-
----
-
-You are here to help leadership make decisions faster and with more clarity.
-
----
-
-OUTPUT FORMAT (MANDATORY):
-
-Return TWO sections:
-
-*CHANNEL_SUMMARY*
-- Max 4 bullets
-- Each bullet = one line
-- Focus only on the most critical signals
-- No explanations
-
-*THREAD_DETAIL*
-- Use full structured format (areas, severity, diagnosis)
-- Keep Slack-friendly formatting (short lines, spacing)
-- No tables
-- Clear, scannable sections
-
-Do not merge both sections.
-Do not add extra commentary outside these sections.
-
----
-
-## Company Objectives — Q${quarter} ${year}
+Company Objectives:
 ${coList}
 
-## Flagged Items
-🔴 At-Risk KRs (${atRisk.length}):
-${atRisk.length > 0 ? atRisk.map(r => `  - ${r}`).join('\n') : '  None'}
+${atRiskSection}
 
-🟠 Never Updated KRs (${stale.length}):
-${stale.length > 0 ? stale.map(s => `  - ${s}`).join('\n') : '  None'}
+${staleSection}
 
-🟡 No OKRs Set (${missingAreas.length}):
-${missingAreas.length > 0 ? missingAreas.map(a => `  - ${a}`).join('\n') : '  None'}
+${missingSection}
 
-## Area OKR Detail
-${areaDetail}
-`
+Area Detail:
+${areaDetail}`
 }
 
-// ─── Route handler ────────────────────────────────────────────────────────────
+// --- Route handler -----------------------------------------------------------
 export async function POST(request: NextRequest) {
   const rawBody = await request.text()
 
@@ -283,7 +195,7 @@ export async function POST(request: NextRequest) {
 
   // Only handle app_mention (channel) and message.im (DM, non-bot)
   const isMention = event.type === 'app_mention'
-  const isDM       = event.type === 'message' && event.channel_type === 'im' && !event.bot_id && !event.subtype
+  const isDM      = event.type === 'message' && event.channel_type === 'im' && !event.bot_id && !event.subtype
 
   if (!isMention && !isDM) return NextResponse.json({ ok: true })
 
@@ -296,7 +208,7 @@ export async function POST(request: NextRequest) {
     setTimeout(() => processedEvents.delete(eventId), 5 * 60 * 1000)
   }
 
-  // Extract question — strip bot mention from text
+  // Extract question -- strip bot mention from text
   const authUserId = (payload.authorizations as { user_id?: string }[] | undefined)?.[0]?.user_id ?? ''
   const rawText    = (event.text as string ?? '').replace(`<@${authUserId}>`, '').trim()
 
@@ -305,23 +217,21 @@ export async function POST(request: NextRequest) {
   const channel  = event.channel  as string
   const threadTs = (event.thread_ts ?? event.ts) as string
 
-  // Post "Thinking…" immediately so Slack feels responsive
-  const thinkingTs = await slackPost(channel, '_Thinking…_', threadTs)
+  // Post "Thinking..." immediately so Slack feels responsive
+  const thinkingTs = await slackPost(channel, '_Thinking..._', threadTs)
 
   // Process after response is sent (avoids Slack's 3s timeout)
   after(async () => {
     try {
-const [context] = await Promise.all([buildOKRContext()])
-const client = new Anthropic()
+      const context = await buildOKRContext()
+      const client  = new Anthropic()
 
-console.log("🔑 ANTHROPIC KEY PREFIX:", process.env.ANTHROPIC_API_KEY?.slice(0, 20))
-
-const response = await client.messages.create({
-  model: 'claude-sonnet-4-6',
-  max_tokens: 1024,
-  system: context,
-  messages: [{ role: 'user', content: rawText }],
-})
+      const response = await client.messages.create({
+        model:     'claude-sonnet-4-6',
+        max_tokens: 400,
+        system:    context,
+        messages:  [{ role: 'user', content: rawText }],
+      })
 
       const answer = response.content.find(b => b.type === 'text')?.text ?? '_No response generated._'
 
@@ -334,7 +244,7 @@ const response = await client.messages.create({
       console.log(`[slack/events] Answered "${rawText.slice(0, 60)}" in ${channel}`)
     } catch (err) {
       console.error('[slack/events] Processing error:', err)
-      const errMsg = '⚠️ Something went wrong. Please try again in a moment.'
+      const errMsg = 'Something went wrong. Please try again in a moment.'
       if (thinkingTs) await slackUpdate(channel, thinkingTs, errMsg)
       else await slackPost(channel, errMsg, threadTs)
     }
