@@ -39,149 +39,303 @@ export default function AreaOKRsClient({
   }
 
   async function downloadTemplate() {
-    const { Document, Packer, Paragraph, TextRun } = await import('docx')
+    const {
+      Document, Packer, Paragraph, TextRun,
+      Table, TableRow, TableCell,
+      WidthType, BorderStyle, AlignmentType,
+    } = await import('docx')
 
-    const LINE = '_______________________________________________'
-    const LONG_LINE = '________________________________________________________________'
+    const F = 'Poppins'
+    const RED    = 'FF5A70'
+    const PURPLE = '4A268C'
+    const DARK   = '1A1040'
+    const MID    = '6B7280'
+    const MUTED  = 'AAAAAA'
+    const RULE   = 'E5E7EB'
+    const PILL_BG = 'FFF1F3'   // light pink for objective pill
+    const KR_BG   = 'F9F8FF'   // very light purple for KR block
 
-    const children: InstanceType<typeof Paragraph>[] = []
+    // ── Helpers ──────────────────────────────────────────────
 
-    const gap = (after = 160) => new Paragraph({ children: [new TextRun('')], spacing: { after } })
-    const rule = () => new Paragraph({
-      children: [new TextRun({ text: '─'.repeat(68), color: 'CCCCCC', size: 18 })],
-      spacing: { before: 80, after: 200 },
+    // Invisible border (removes default table cell borders)
+    const noBorder = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
+    const noBorders = { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder }
+
+    // Thin bottom border for fill-in lines
+    const fillBorder = { bottom: { style: BorderStyle.SINGLE, size: 6, color: 'D1D5DB' }, top: noBorder, left: noBorder, right: noBorder }
+
+    // Empty spacer paragraph
+    const sp = (after = 160) => new Paragraph({ children: [new TextRun({ text: ' ', font: F, size: 18 })], spacing: { after } })
+
+    // Thin full-width rule
+    const hr = (color = RULE, after = 240) => new Paragraph({
+      border: { bottom: { style: BorderStyle.SINGLE, size: 4, color } },
+      children: [new TextRun({ text: ' ', font: F, size: 4 })],
+      spacing: { after },
     })
 
-    // ── Header ──────────────────────────────────────────────
-    children.push(new Paragraph({
-      children: [new TextRun({ text: `${area.name}`, bold: true, size: 52, color: '1a1040' })],
-      spacing: { after: 60 },
-    }))
-    children.push(new Paragraph({
-      children: [new TextRun({ text: `Weekly OKR Update  ·  Q${quarter} ${year}`, size: 26, color: '888888' })],
-      spacing: { after: 280 },
-    }))
+    // Label above a fill-in line
+    const fieldLabel = (text: string) => new Paragraph({
+      children: [new TextRun({ text, font: F, size: 17, color: MID, bold: true, allCaps: true })],
+      spacing: { before: 160, after: 60 },
+    })
 
-    // ── Fill-in header fields ────────────────────────────────
+    // Actual fill-in line (bottom border)
+    const fieldLine = () => new Paragraph({
+      children: [new TextRun({ text: ' ', font: F, size: 24 })],
+      border: fillBorder,
+      spacing: { after: 0 },
+    })
+
+    // Section label (e.g. "WHAT HAPPENED THIS WEEK")
+    const sectionLabel = (text: string, after = 80) => new Paragraph({
+      children: [new TextRun({ text, font: F, size: 17, color: MID, bold: true, allCaps: true })],
+      spacing: { before: 200, after },
+    })
+
+    // Multiple fill-in lines
+    const fillLines = (count: number, after = 120) =>
+      Array.from({ length: count }, (_, i) => new Paragraph({
+        children: [new TextRun({ text: ' ', font: F, size: 26 })],
+        border: fillBorder,
+        spacing: { after: i < count - 1 ? 100 : after },
+      }))
+
+    // ── Build document ───────────────────────────────────────
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const children: any[] = []
+
+    // ── HEADER ───────────────────────────────────────────────
     children.push(new Paragraph({
       children: [
-        new TextRun({ text: 'Week of:        ', bold: true, size: 22 }),
-        new TextRun({ text: LINE, size: 22, color: 'AAAAAA' }),
+        new TextRun({ text: area.name, font: F, size: 56, bold: true, color: DARK }),
       ],
-      spacing: { after: 120 },
+      spacing: { after: 80 },
     }))
     children.push(new Paragraph({
       children: [
-        new TextRun({ text: 'Reported by:  ', bold: true, size: 22 }),
-        new TextRun({ text: LINE, size: 22, color: 'AAAAAA' }),
+        new TextRun({ text: 'Weekly OKR Update', font: F, size: 26, color: RED }),
+        new TextRun({ text: `   ·   Q${quarter} ${year}`, font: F, size: 26, color: MUTED }),
       ],
       spacing: { after: 320 },
     }))
 
-    // ── Instructions ─────────────────────────────────────────
-    children.push(new Paragraph({
-      children: [new TextRun({
-        text: 'Instructions: Fill in every section below. Confidence score: 1 = Off track  |  2 = At risk  |  3 = Cautious  |  4 = Good  |  5 = On track. When done, save as PDF and upload via "AI Weekly Update" in the app.',
-        italics: true, size: 18, color: '777777',
-      })],
-      spacing: { after: 320 },
+    // ── META FIELDS (two-column table) ───────────────────────
+    children.push(new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      layout: 'fixed' as never,
+      rows: [
+        new TableRow({
+          children: [
+            new TableCell({
+              width: { size: 50, type: WidthType.PERCENTAGE },
+              borders: noBorders,
+              margins: { right: 400 },
+              children: [
+                fieldLabel('Week of'),
+                fieldLine(),
+              ],
+            }),
+            new TableCell({
+              width: { size: 50, type: WidthType.PERCENTAGE },
+              borders: noBorders,
+              children: [
+                fieldLabel('Reported by'),
+                fieldLine(),
+              ],
+            }),
+          ],
+        }),
+      ],
     }))
 
-    children.push(rule())
+    children.push(sp(320))
+    children.push(hr(RULE, 320))
 
-    // ── Objectives & KRs ─────────────────────────────────────
+    // ── INSTRUCTIONS ─────────────────────────────────────────
+    children.push(new Paragraph({
+      children: [
+        new TextRun({ text: 'How to fill this in: ', font: F, size: 18, bold: true, color: PURPLE }),
+        new TextRun({
+          text: 'Complete every field for each key result. For confidence, use: 1 = Off track  ·  2 = At risk  ·  3 = Cautious  ·  4 = Good  ·  5 = On track. Save as PDF when done and upload via ',
+          font: F, size: 18, color: MID,
+        }),
+        new TextRun({ text: 'AI Weekly Update', font: F, size: 18, bold: true, color: PURPLE }),
+        new TextRun({ text: ' in the app.', font: F, size: 18, color: MID }),
+      ],
+      spacing: { after: 400 },
+    }))
+
+    // ── OBJECTIVES & KRs ─────────────────────────────────────
     objectives.forEach((obj, objIdx) => {
+
+      // Objective pill header
       children.push(new Paragraph({
-        children: [new TextRun({
-          text: `OBJECTIVE ${objIdx + 1}:  ${obj.title}`,
-          bold: true, size: 30, color: '1a1040',
-        })],
-        spacing: { before: 160, after: 100 },
+        children: [
+          new TextRun({ text: `OBJECTIVE ${objIdx + 1}`, font: F, size: 17, bold: true, color: RED, allCaps: true }),
+          new TextRun({ text: '   ', font: F, size: 17 }),
+        ],
+        spacing: { before: 80, after: 100 },
+        shading: { type: 'clear' as never, fill: PILL_BG },
+        border: {
+          left: { style: BorderStyle.SINGLE, size: 16, color: RED },
+          top: noBorder, bottom: noBorder, right: noBorder,
+        },
+        indent: { left: 160 },
+      }))
+      children.push(new Paragraph({
+        children: [new TextRun({ text: obj.title, font: F, size: 28, bold: true, color: DARK })],
+        indent: { left: 180 },
+        spacing: { after: 80 },
+        shading: { type: 'clear' as never, fill: PILL_BG },
+        border: {
+          left: { style: BorderStyle.SINGLE, size: 16, color: RED },
+          top: noBorder, bottom: noBorder, right: noBorder,
+        },
       }))
 
       if (obj.aligned_objective?.title) {
         children.push(new Paragraph({
-          children: [new TextRun({
-            text: `↳ Aligned to company objective: ${obj.aligned_objective.title}`,
-            italics: true, size: 19, color: 'FF5A70',
-          })],
-          spacing: { after: 200 },
+          children: [
+            new TextRun({ text: '↳ Aligned to: ', font: F, size: 18, color: MUTED }),
+            new TextRun({ text: obj.aligned_objective.title, font: F, size: 18, color: PURPLE, italics: true }),
+          ],
+          indent: { left: 180 },
+          spacing: { before: 60, after: 0 },
+          shading: { type: 'clear' as never, fill: PILL_BG },
+          border: {
+            left: { style: BorderStyle.SINGLE, size: 16, color: RED },
+            top: noBorder, bottom: noBorder, right: noBorder,
+          },
         }))
       }
+
+      children.push(sp(240))
 
       const krs = obj.key_results ?? []
       krs.forEach((kr, krIdx) => {
         const unitStr = kr.unit ? ` ${kr.unit}` : ''
 
+        // KR number badge + description
+        children.push(new Paragraph({
+          children: [
+            new TextRun({ text: `KR ${objIdx + 1}.${krIdx + 1}`, font: F, size: 18, bold: true, color: PURPLE, allCaps: true }),
+          ],
+          spacing: { before: 80, after: 60 },
+          shading: { type: 'clear' as never, fill: KR_BG },
+          border: {
+            left: { style: BorderStyle.SINGLE, size: 10, color: PURPLE },
+            top: noBorder, bottom: noBorder, right: noBorder,
+          },
+          indent: { left: 160 },
+        }))
+        children.push(new Paragraph({
+          children: [new TextRun({ text: kr.description, font: F, size: 23, bold: true, color: DARK })],
+          indent: { left: 180 },
+          shading: { type: 'clear' as never, fill: KR_BG },
+          border: {
+            left: { style: BorderStyle.SINGLE, size: 10, color: PURPLE },
+            top: noBorder, bottom: noBorder, right: noBorder,
+          },
+          spacing: { after: 60 },
+        }))
+        children.push(new Paragraph({
+          children: [new TextRun({ text: `Target: ${kr.target_value}${unitStr}`, font: F, size: 18, color: MUTED })],
+          indent: { left: 180 },
+          shading: { type: 'clear' as never, fill: KR_BG },
+          border: {
+            left: { style: BorderStyle.SINGLE, size: 10, color: PURPLE },
+            top: noBorder, bottom: noBorder, right: noBorder,
+          },
+          spacing: { after: 0 },
+        }))
+
+        children.push(sp(200))
+
+        // Current value + Confidence (two-column)
+        children.push(new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          layout: 'fixed' as never,
+          rows: [
+            new TableRow({
+              children: [
+                new TableCell({
+                  width: { size: 50, type: WidthType.PERCENTAGE },
+                  borders: noBorders,
+                  margins: { right: 400 },
+                  children: [
+                    fieldLabel(`Current value  /  target: ${kr.target_value}${unitStr}`),
+                    fieldLine(),
+                  ],
+                }),
+                new TableCell({
+                  width: { size: 50, type: WidthType.PERCENTAGE },
+                  borders: noBorders,
+                  children: [
+                    fieldLabel('Confidence score (1 – 5)'),
+                    fieldLine(),
+                  ],
+                }),
+              ],
+            }),
+          ],
+        }))
+
+        children.push(sp(80))
+
+        // Confidence legend
         children.push(new Paragraph({
           children: [new TextRun({
-            text: `KR ${objIdx + 1}.${krIdx + 1}  —  ${kr.description}`,
-            bold: true, size: 23,
+            text: '1 = Off track   ·   2 = At risk   ·   3 = Cautious   ·   4 = Good   ·   5 = On track',
+            font: F, size: 16, color: MUTED, italics: true,
           })],
-          spacing: { before: 240, after: 140 },
+          spacing: { after: 40 },
+          alignment: AlignmentType.CENTER,
         }))
 
-        // Current value
-        children.push(new Paragraph({
-          children: [
-            new TextRun({ text: 'Current value:', bold: true, size: 21 }),
-            new TextRun({ text: `   ________   /  ${kr.target_value}${unitStr}`, size: 21 }),
-          ],
-          spacing: { after: 100 },
-        }))
-
-        // Confidence
-        children.push(new Paragraph({
-          children: [
-            new TextRun({ text: 'Confidence (1–5):', bold: true, size: 21 }),
-            new TextRun({ text: '   ________', size: 21 }),
-          ],
-          spacing: { after: 180 },
-        }))
+        children.push(sp(80))
 
         // Weekly update
-        children.push(new Paragraph({
-          children: [new TextRun({ text: 'What happened this week? (2–4 sentences)', bold: true, size: 21 })],
-          spacing: { after: 80 },
-        }))
-        children.push(new Paragraph({
-          children: [new TextRun({ text: LONG_LINE, size: 21, color: 'CCCCCC' })],
-          spacing: { after: 80 },
-        }))
-        children.push(new Paragraph({
-          children: [new TextRun({ text: LONG_LINE, size: 21, color: 'CCCCCC' })],
-          spacing: { after: 80 },
-        }))
-        children.push(new Paragraph({
-          children: [new TextRun({ text: LONG_LINE, size: 21, color: 'CCCCCC' })],
-          spacing: { after: 160 },
-        }))
+        children.push(sectionLabel('What happened this week? (2–4 sentences)'))
+        children.push(...fillLines(3, 160))
 
         // Blockers
-        children.push(new Paragraph({
-          children: [new TextRun({ text: 'Key blockers or dependencies', bold: true, size: 21 })],
-          spacing: { after: 80 },
-        }))
-        children.push(new Paragraph({
-          children: [new TextRun({ text: LONG_LINE, size: 21, color: 'CCCCCC' })],
-          spacing: { after: 80 },
-        }))
-        children.push(gap(200))
-      })
+        children.push(sectionLabel('Key blockers or dependencies'))
+        children.push(...fillLines(2, 60))
 
-      if (objIdx < objectives.length - 1) children.push(rule())
+        children.push(sp(280))
+        children.push(hr('E5E7EB', 280))
+      })
     })
 
-    // ── Footer ───────────────────────────────────────────────
-    children.push(rule())
+    // ── FOOTER ───────────────────────────────────────────────
     children.push(new Paragraph({
       children: [new TextRun({
-        text: `Generated by Ontop OKR System  ·  Q${quarter} ${year}  ·  ${area.name}`,
-        size: 16, color: 'BBBBBB', italics: true,
+        text: `Ontop OKR System  ·  ${area.name}  ·  Q${quarter} ${year}`,
+        font: F, size: 16, color: MUTED, italics: true,
       })],
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 160 },
     }))
 
-    const doc = new Document({ sections: [{ children }] })
+    const doc = new Document({
+      styles: {
+        default: {
+          document: {
+            run: { font: F, size: 22, color: DARK },
+          },
+        },
+      },
+      sections: [{
+        properties: {
+          page: {
+            margin: { top: 800, bottom: 800, left: 900, right: 900 },
+          },
+        },
+        children,
+      }],
+    })
+
     const blob = await Packer.toBlob(doc)
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
