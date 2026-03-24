@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
-import { del } from '@vercel/blob'
 
 export const maxDuration = 120 // 2 minutes for large PDFs
 
@@ -22,20 +21,13 @@ export interface KRUpdate {
 }
 
 export async function POST(request: NextRequest) {
-  console.log('[ai-update] POST received')
   try {
     const formData = await request.formData()
-    const blobUrl  = formData.get('blobUrl')  as string | null
     const pdfFile  = formData.get('pdf')      as File   | null
     const krsJson  = formData.get('krs')      as string | null
     const areaName = formData.get('areaName') as string | null
 
-    console.log('[ai-update] blobUrl:', blobUrl ?? '(none)')
-    console.log('[ai-update] pdfFile:', pdfFile ? `${pdfFile.name} (${pdfFile.size} bytes)` : '(none)')
-    console.log('[ai-update] areaName:', areaName)
-
-    if ((!blobUrl && !pdfFile) || !krsJson || !areaName) {
-      console.error('[ai-update] missing required fields')
+    if (!pdfFile || !krsJson || !areaName) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
@@ -44,23 +36,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No key results found for this area' }, { status: 400 })
     }
 
-    // Fetch PDF bytes — either from Vercel Blob URL or direct upload
-    let pdfBase64: string
-    if (blobUrl) {
-      console.log('[ai-update] fetching PDF from blob:', blobUrl)
-      const blobRes = await fetch(blobUrl)
-      if (!blobRes.ok) {
-        console.error('[ai-update] blob fetch failed:', blobRes.status, blobRes.statusText)
-        throw new Error(`Failed to fetch PDF from storage (${blobRes.status})`)
-      }
-      const bytes = await blobRes.arrayBuffer()
-      console.log('[ai-update] blob fetched, size:', bytes.byteLength, 'bytes')
-      pdfBase64 = Buffer.from(bytes).toString('base64')
-    } else {
-      console.log('[ai-update] using direct PDF upload')
-      pdfBase64 = Buffer.from(await pdfFile!.arrayBuffer()).toString('base64')
-    }
-    console.log('[ai-update] PDF converted to base64, calling Claude')
+    const pdfBase64 = Buffer.from(await pdfFile.arrayBuffer()).toString('base64')
 
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -172,11 +148,6 @@ Generate one update per KR. Use the exact KR IDs provided.`,
     }
 
     const result = toolUseBlock.input as { updates: KRUpdate[] }
-
-    // Clean up the temporary blob now that we have the result
-    if (blobUrl) {
-      try { await del(blobUrl) } catch { /* non-fatal */ }
-    }
 
     return NextResponse.json({ updates: result.updates })
   } catch (error) {

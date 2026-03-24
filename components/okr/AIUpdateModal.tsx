@@ -17,7 +17,6 @@ import { AreaObjective, calcProgress } from '@/types'
 import { createClient } from '@/lib/supabase/client'
 import { KRInput, KRUpdate } from '@/app/api/ai-update/route'
 import { Upload, FileText, Sparkles, Check, AlertCircle, Loader2 } from 'lucide-react'
-import { upload } from '@vercel/blob/client'  // client-side direct upload, bypasses 4.5 MB serverless limit
 import { cn } from '@/lib/utils'
 
 interface AIUpdateModalProps {
@@ -69,7 +68,7 @@ export default function AIUpdateModal({
   // Build a lookup map: KR id → KR details
   const krMap = Object.fromEntries(allKRs.map(kr => [kr.id, kr]))
 
-  const MAX_PDF_MB = 15
+  const MAX_PDF_MB = 4
   const MAX_PDF_BYTES = MAX_PDF_MB * 1024 * 1024
 
   function handleFileSelect(file: File) {
@@ -98,31 +97,12 @@ export default function AIUpdateModal({
     setError(null)
 
     try {
-      // Step 1: Upload PDF directly to Vercel Blob (bypasses 4.5 MB serverless limit)
-      console.log('[ai-update] starting blob upload:', pdfFile.name, `${(pdfFile.size / 1024 / 1024).toFixed(2)} MB`)
-      let blob: { url: string }
-      try {
-        blob = await upload(pdfFile.name, pdfFile, {
-          access: 'public',
-          contentType: 'application/pdf',   // must match allowedContentTypes in /api/upload token
-          handleUploadUrl: '/api/upload',
-        })
-        console.log('[ai-update] blob upload complete, URL:', blob.url)
-      } catch (uploadErr) {
-        const msg = uploadErr instanceof Error ? uploadErr.message : String(uploadErr)
-        console.error('[ai-update] blob upload failed:', msg)
-        throw new Error(`File upload failed: ${msg}`)
-      }
-
-      // Step 2: Call AI route with the blob URL
-      console.log('[ai-update] calling /api/ai-update')
       const formData = new FormData()
-      formData.append('blobUrl', blob.url)
+      formData.append('pdf', pdfFile)
       formData.append('krs', JSON.stringify(allKRs))
       formData.append('areaName', areaName)
 
       const res = await fetch('/api/ai-update', { method: 'POST', body: formData })
-      console.log('[ai-update] /api/ai-update response status:', res.status)
 
       let data: { updates?: KRUpdate[]; error?: string }
       try {
@@ -139,9 +119,8 @@ export default function AIUpdateModal({
       setStep('preview')
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Something went wrong'
-      console.error('[ai-update] handleGenerate error:', msg)
       setError(msg)
-      setStep('upload')   // always escape the loading state
+      setStep('upload')
     }
   }
 
