@@ -8,6 +8,7 @@ import InsightsPanel from '@/components/admin/InsightsPanel'
 import { Loader2, Send, CheckCircle2, Bot, User, Sparkles, BarChart2, History, ArrowLeft, Plus, Trash2, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import ReactMarkdown from 'react-markdown'
+import { marked } from 'marked'
 
 interface AreaPayload extends AreaInsightData {
   companyObjectives: string[]
@@ -240,6 +241,15 @@ export default function ExecutiveClient({
     const escapeHtml = (s: string) =>
       s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
+    const renderBody = (m: ChatMessage) => {
+      if (m.role === 'assistant') {
+        // Parse markdown → HTML so headers, bold, lists render properly
+        return marked.parse(m.content) as string
+      }
+      // User messages: plain text, preserve newlines
+      return `<p>${escapeHtml(m.content).replace(/\n/g, '<br>')}</p>`
+    }
+
     const sessionHtml = sessions.map(session => {
       const date = new Date(session.savedAt).toLocaleString('en-US', {
         dateStyle: 'medium', timeStyle: 'short',
@@ -247,7 +257,7 @@ export default function ExecutiveClient({
       const messages = session.messages.map(m => `
         <div class="msg ${m.role}">
           <div class="label">${m.role === 'user' ? 'You' : 'AI Chief of Staff'}</div>
-          <div class="body">${escapeHtml(m.content).replace(/\n/g, '<br>')}</div>
+          <div class="body">${renderBody(m)}</div>
         </div>`).join('')
       return `
         <div class="session">
@@ -277,12 +287,26 @@ export default function ExecutiveClient({
         .session-date { display: block; font-size: 11px; color: #999; margin-top: 2px; }
         .msg { margin-bottom: 14px; }
         .label { font-size: 11px; font-weight: 600; text-transform: uppercase;
-                 letter-spacing: .05em; margin-bottom: 4px; color: #888; }
+                 letter-spacing: .05em; margin-bottom: 6px; color: #888; }
         .msg.user .label { color: #4A268C; }
         .msg.assistant .label { color: #c0392b; }
-        .body { line-height: 1.6; color: #222; white-space: pre-wrap; }
+        .body { line-height: 1.7; color: #222; }
         .msg.user .body { background: #f5f3ff; border-radius: 8px; padding: 10px 14px; }
-        .msg.assistant .body { background: #fff8f8; border-radius: 8px; padding: 10px 14px; }
+        .msg.assistant .body { background: #fff8f8; border-radius: 8px; padding: 12px 16px; }
+        /* Markdown elements inside assistant messages */
+        .body h1,.body h2,.body h3 { font-weight: 700; margin: 14px 0 6px; color: #111; }
+        .body h1 { font-size: 17px; }
+        .body h2 { font-size: 15px; }
+        .body h3 { font-size: 14px; }
+        .body p { margin: 0 0 8px; }
+        .body p:last-child { margin-bottom: 0; }
+        .body ul,.body ol { padding-left: 20px; margin: 6px 0 10px; }
+        .body li { margin-bottom: 4px; }
+        .body strong { font-weight: 600; color: #111; }
+        .body em { font-style: italic; }
+        .body hr { border: none; border-top: 1px solid #e0e0e0; margin: 12px 0; }
+        .body code { background: #f0f0f0; border-radius: 3px;
+                     padding: 1px 5px; font-size: 12px; font-family: monospace; }
         .divider { border-top: 2px dashed #e5e5e5; margin: 40px 0; }
         .print-btn { display: block; margin: 0 auto 32px;
                      padding: 10px 24px; background: #4A268C; color: #fff;
