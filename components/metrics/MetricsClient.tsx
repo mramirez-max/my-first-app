@@ -118,22 +118,24 @@ export default function MetricsClient({ isAdmin }: Props) {
     }
   }
 
-  function DeltaBadge({ current, prev, format }: { current: number | null; prev: number | null; format: MetricDefinition['format'] }) {
+  function DeltaBadge({ current, prev, format, invertDelta }: { current: number | null; prev: number | null; format: MetricDefinition['format']; invertDelta?: boolean }) {
     if (current === null || prev === null || prev === 0) return null
     const delta   = current - prev
     const pct     = (delta / Math.abs(prev)) * 100
-    const up      = delta > 0
     const neutral = Math.abs(pct) < 0.1
 
     if (neutral) return <span className="flex items-center gap-0.5 text-xs text-white/30"><Minus size={10} /> 0%</span>
+
+    // For inverted metrics (e.g. Burn): going down is good (green), going up is bad (red)
+    const positive = invertDelta ? delta < 0 : delta > 0
 
     const formatted = format === 'percent'
       ? `${Math.abs(delta).toFixed(1)}pp`
       : `${Math.abs(pct).toFixed(1)}%`
 
     return (
-      <span className={cn('flex items-center gap-0.5 text-xs font-medium', up ? 'text-emerald-400' : 'text-rose-400')}>
-        {up ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+      <span className={cn('flex items-center gap-0.5 text-xs font-medium', positive ? 'text-emerald-400' : 'text-rose-400')}>
+        {delta > 0 ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
         {formatted}
       </span>
     )
@@ -309,7 +311,7 @@ export default function MetricsClient({ isAdmin }: Props) {
                             </div>
                           ) : (
                             <>
-                              <DeltaBadge current={current} prev={prev} format={def.format} />
+                              <DeltaBadge current={current} prev={prev} format={def.format} invertDelta={def.invertDelta} />
                               <span className={cn(
                                 'text-sm font-semibold tabular-nums min-w-[72px] text-right',
                                 current !== null ? 'text-white' : 'text-white/25'

@@ -4,7 +4,8 @@ export interface MetricDefinition {
   name: string
   category: string
   format: MetricFormat
-  aliases?: string[]  // alternative CSV names that map to this metric
+  aliases?: string[]      // alternative CSV names that map to this metric
+  invertDelta?: boolean   // true = lower value is better (e.g. Burn, Churn)
 }
 
 export const METRIC_CATEGORIES = [
@@ -46,7 +47,7 @@ export const METRIC_DEFINITIONS: MetricDefinition[] = [
   { name: 'Total Card Spending',         category: 'Banking & Cards',     format: 'currency' },
   // People & Efficiency
   { name: 'Headcount',                   category: 'People & Efficiency', format: 'number'   },
-  { name: 'Burn',                        category: 'People & Efficiency', format: 'currency', aliases: ['burn/ operational cash', 'burn/operational cash', 'operational cash'] },
+  { name: 'Burn',                        category: 'People & Efficiency', format: 'currency', aliases: ['burn/ operational cash', 'burn/operational cash', 'operational cash'], invertDelta: true },
   { name: 'Revenue per Team Member',     category: 'People & Efficiency', format: 'currency' },
   { name: 'ARR per Team Member',         category: 'People & Efficiency', format: 'currency' },
 ]
