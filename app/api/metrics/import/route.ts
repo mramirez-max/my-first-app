@@ -41,8 +41,14 @@ export async function POST(request: NextRequest) {
     }, { status: 400 })
   }
 
-  // Build a lookup: lowercase name -> definition
-  const defMap = new Map(METRIC_DEFINITIONS.map(m => [m.name.toLowerCase(), m]))
+  // Build a lookup: lowercase name (and aliases) -> definition
+  const defMap = new Map<string, typeof METRIC_DEFINITIONS[number]>()
+  for (const m of METRIC_DEFINITIONS) {
+    defMap.set(m.name.toLowerCase(), m)
+    for (const alias of m.aliases ?? []) {
+      defMap.set(alias.toLowerCase(), m)
+    }
+  }
 
   const rows: { metric_name: string; category: string; month: number; year: number; value: number; updated_by: string }[] = []
   const errors: string[] = []
