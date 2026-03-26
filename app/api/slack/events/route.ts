@@ -4,6 +4,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentQuarter } from '@/types'
 import { getTodayMeetingTitles, getAreasForMeetings } from '@/lib/google-calendar'
+import { METRIC_DEFINITIONS, formatMetricValue } from '@/lib/metrics'
 
 // --- Deduplication (in-memory, sufficient for serverless retries) -------------
 const processedEvents = new Set<string>()
@@ -59,10 +60,18 @@ async function buildOKRContext(): Promise<string> {
   const supabase          = createAdminClient()
   const { quarter, year } = getCurrentQuarter()
 
+  // Latest month with metrics data
+  const now = new Date()
+  const latestMonth = now.getMonth() + 1
+  const latestYear  = now.getFullYear()
+  const prevMonth   = latestMonth === 1 ? 12 : latestMonth - 1
+  const prevYear    = latestMonth === 1 ? latestYear - 1 : latestYear
+
   const [
     { data: areas },
     { data: companyObjectives },
     { data: areaObjectives },
+    { data: metricsRaw },
   ] = await Promise.all([
     supabase.from('areas').select('id, name').order('name'),
     supabase.from('company_objectives').select('title').eq('quarter', quarter).eq('year', year),
@@ -71,6 +80,10 @@ async function buildOKRContext(): Promise<string> {
       .select('area_id, area:areas(name), key_results:area_key_results(description, updates:area_kr_updates(confidence_score, update_text, created_at))')
       .eq('quarter', quarter)
       .eq('year', year),
+    supabase
+      .from('business_metrics')
+      .select('metric_name, month, year, value')
+      .or(`and(month.eq.${latestMonth},year.eq.${latestYear}),and(month.eq.${prevMonth},year.eq.${prevYear})`),
   ])
 
   type KRRow  = { description: string; updates: { confidence_score: number; update_text: string; created_at: string }[] }
@@ -129,6 +142,28 @@ async function buildOKRContext(): Promise<string> {
     .map(([name, krs]) => `*${name}*\n${krs.join('\n')}`)
     .join('\n\n') || '(No area OKRs set this quarter.)'
 
+  // Business metrics summary
+  const metricRows = metricsRaw ?? []
+  const getValue = (name: string, m: number, y: number) =>
+    metricRows.find(r => r.metric_name === name && r.month === m && r.year === y)?.value ?? null
+
+  const metricsLines = METRIC_DEFINITIONS.map(def => {
+    const cur  = getValue(def.name, latestMonth, latestYear)
+    const prev = getValue(def.name, prevMonth, prevYear)
+    if (cur === null) return null
+    const formatted = formatMetricValue(cur, def.format)
+    let delta = ''
+    if (prev !== null && prev !== 0) {
+      const pct = ((cur - prev) / Math.abs(prev)) * 100
+      delta = ` (${pct > 0 ? '+' : ''}${pct.toFixed(1)}% MoM)`
+    }
+    return `  ${def.name}: ${formatted}${delta}`
+  }).filter(Boolean)
+
+  const metricsSection = metricsLines.length > 0
+    ? `Business Metrics (latest: ${now.toLocaleString('default', { month: 'long' })} ${latestYear}):\n${metricsLines.join('\n')}`
+    : 'Business Metrics: no data entered yet'
+
   const atRiskSection = atRisk.length === 0
     ? 'At-Risk KRs (confidence <=2): None'
     : `At-Risk KRs (confidence <=2):\n${atRisk.map(r => `  - ${r}`).join('\n')}`
@@ -142,6 +177,7 @@ async function buildOKRContext(): Promise<string> {
     : `No OKRs Set: ${missingAreas.join(', ')}`
 
   return `You are the AI Chief of Staff for Ontop. Blunt, direct, no fluff.
+You have access to OKR data AND live business metrics. Use both when relevant.
 
 Answer the question asked. Nothing more.
 
@@ -157,6 +193,8 @@ Q${quarter} ${year} OKR DATA:
 
 Company Objectives:
 ${coList}
+
+${metricsSection}
 
 ${atRiskSection}
 

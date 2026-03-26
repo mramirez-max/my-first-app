@@ -151,62 +151,39 @@ export async function POST(request: NextRequest) {
       return `Area: ${a.area}\n${krLines || '  (no key results)'}`
     }).join('\n\n')
 
-    const prompt = `You are an AI Chief of Staff preparing a daily executive briefing for the CEO (Julian) and COO (Cami) of Ontop, a global payroll and workforce platform.
+    const prompt = `You are a blunt AI Chief of Staff. No fluff, no filler, no consulting speak. Every word must earn its place.
 
-Today is ${today}. Today's leadership reviews: ${reviewLabel}.
-Quarter: Q${quarter} ${year}.
-${calendarError ? `Note: Calendar was unavailable, showing all areas.\n` : ''}
+Today: ${today} | Q${quarter} ${year} | Areas in review: ${reviewLabel}
+${calendarError ? `(Calendar unavailable — showing all areas)\n` : ''}
 
-Here is the raw OKR data for today's areas:
-
+OKR DATA:
 ${areaDataText}
 
-You must output TWO sections separated by the exact token THREAD_DETAIL: on its own line.
+Output exactly TWO sections using these tokens on their own line: CHANNEL_SUMMARY: and THREAD_DETAIL:
 
-─────────────────────────────────────
-SECTION 1 — CHANNEL_SUMMARY:
-─────────────────────────────────────
-Start your output with the literal token CHANNEL_SUMMARY: on its own line, then write a SHORT channel summary with a BLANK LINE between each element:
+CHANNEL_SUMMARY:
+3–5 lines max. No intro, no sign-off.
 
-Line 1: "Hey Juli and Cami! 👋 Here's today's exec brief | ${today}"
+"Hey Juli & Cami 👋 | ${today}"
+[ONE line: the single most important thing to know today — max 15 words]
+[2–3 bullets, one per critical area, format: *Area* → risk in <10 words → ❓ question]
 
-[blank line]
+THREAD_DETAIL:
+One block per critical area (3–5 areas max). Each block:
 
-Line 2: ONE sentence on today's biggest theme (max 20 words)
+*Area Name*
+🔥 [Risk in one short sentence. Bold the number.]
+❓ [One question the owner must answer today.]
 
-[blank line]
+Blank line between areas. Nothing else.
+End with: "_→ https://ontop-okr-app.vercel.app/executive_"
 
-Lines 3–5: The 2–3 most critical areas, one line each WITH a blank line between each, format:
-*[Area]* → [one-sentence risk or gap] → ❓ [the key question]
-
-[blank line between each area bullet]
-
-─────────────────────────────────────
-SECTION 2 — THREAD_DETAIL:
-─────────────────────────────────────
-Then on a new line write the literal token THREAD_DETAIL: and follow with the full per-area breakdown.
-
-For each of the 3–5 most urgent areas write EXACTLY:
-
-*[Area Name]*
-
-🔥 *At risk:* [One sentence — most pressing business risk. Bold key metrics.]
-👀 *Missing:* [One sentence — most important blind spot or stale signal. Bold key metrics.]
-❓ *Ask:* [One sharp, decision-useful question for the area owner.]
-
-Leave ONE blank line between areas. No "---" dividers.
-
-End the thread with:
-"_Full details → https://ontop-okr-app.vercel.app/executive_"
-
-─────────────────────────────────────
-RULES (apply to both sections):
-─────────────────────────────────────
-- Sound like a COO/operator — no consulting language
-- Confidence 1–2 = at risk. Never updated = missing signal. No OKRs = flying blind.
-- Bold key metrics, numbers, account names with Slack bold (*like this*)
-- If all areas are healthy, say so in one sentence instead of listing areas
-- Output ONLY the two sections. No preamble, no explanation.`
+RULES:
+- No greetings, no "here's your briefing", no transitions, no summaries
+- No area gets more than 2 lines in the thread
+- Confidence ≤2 or no updates = flag it. No OKRs = say "flying blind"
+- Bold metrics with *asterisks*
+- If everything is healthy, write one line saying so. Done.`
 
     const anthropic = new Anthropic()
     const aiResponse = await anthropic.messages.create({

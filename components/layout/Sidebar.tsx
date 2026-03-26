@@ -15,6 +15,7 @@ import {
   LogOut,
   ChevronRight,
   BarChart3,
+  TrendingUp,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -72,6 +73,9 @@ export default function Sidebar({ profile, areas }: SidebarProps) {
         </NavItem>
         <NavItem href="/company" icon={<Target size={16} />} active={pathname === '/company'}>
           Company OKRs
+        </NavItem>
+        <NavItem href="/metrics" icon={<TrendingUp size={16} />} active={pathname === '/metrics'}>
+          Business Metrics
         </NavItem>
 
         {/* Areas */}
