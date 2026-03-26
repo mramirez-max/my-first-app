@@ -113,18 +113,19 @@ async function buildOKRContext(): Promise<string> {
     }
   }
 
-  // Area detail blocks
+  // Area detail blocks — structured per KR with full update text
   const areaBlocks = (areaObjectives ?? []).reduce<Record<string, string[]>>((acc, obj) => {
     const o    = obj as unknown as ObjRow
     const name = getAreaName(o)
     if (!acc[name]) acc[name] = []
     for (const kr of getKRs(o)) {
       const sorted = (kr.updates ?? []).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-      const latest = sorted[0]
-      const status = latest
-        ? `confidence ${latest.confidence_score}/5 -- "${latest.update_text?.slice(0, 100) ?? ''}"`
+      const latest = sorted[0] ?? null
+      const conf   = latest ? `${latest.confidence_score}/5` : 'not rated'
+      const update = latest
+        ? `"${latest.update_text ?? ''}"`
         : 'never updated'
-      acc[name].push(`  - ${kr.description} [${status}]`)
+      acc[name].push(`  KR: ${kr.description}\n  Confidence: ${conf}\n  Latest update: ${update}`)
     }
     return acc
   }, {})
@@ -140,7 +141,7 @@ async function buildOKRContext(): Promise<string> {
   const coList = (companyObjectives ?? []).map(c => `  - ${c.title}`).join('\n') || '  (none set)'
 
   const areaDetail = Object.entries(areaBlocks)
-    .map(([name, krs]) => `*${name}*\n${krs.join('\n')}`)
+    .map(([name, krs]) => `*${name}*\n${krs.join('\n\n')}`)
     .join('\n\n') || '(No area OKRs set this quarter.)'
 
   // Business metrics — all historical data grouped by month
