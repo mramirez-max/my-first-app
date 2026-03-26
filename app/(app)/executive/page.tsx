@@ -94,41 +94,60 @@ export default async function ExecutivePage() {
     }
   }
 
-  // --- Build areaData for InsightsPanel AI scan ---
-  const areaMap: Record<string, { krs: string[]; recentUpdates: string[] }> = {}
-  for (const obj of (areaObjectives ?? []) as unknown as ObjRow[]) {
+  // --- Build areaData for InsightsPanel AI scan + areasPayload for AI chat ---
+  const coMap = Object.fromEntries((companyObjectives ?? []).map(co => [co.id, co.title]))
+
+  type ObjWithAlignment = ObjRow & { id: string }
+
+  const areaMap: Record<string, {
+    krs: string[]
+    recentUpdates: string[]
+    krDetails: { description: string; latestUpdate: string | null; confidence: number | null; updatedAt: string | null; neverUpdated: boolean }[]
+    companyObjectives: Set<string>
+  }> = {}
+
+  for (const obj of (areaObjectives ?? []) as unknown as ObjWithAlignment[]) {
     const areaName = getAreaName(obj)
-    if (!areaMap[areaName]) areaMap[areaName] = { krs: [], recentUpdates: [] }
+    if (!areaMap[areaName]) areaMap[areaName] = { krs: [], recentUpdates: [], krDetails: [], companyObjectives: new Set() }
+
+    if (obj.aligned_to && coMap[obj.aligned_to]) {
+      areaMap[areaName].companyObjectives.add(coMap[obj.aligned_to])
+    }
+
     for (const kr of getKRs(obj)) {
       areaMap[areaName].krs.push(kr.description)
-      const sorted = [...(kr.updates ?? [])].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+
+      const sorted = [...(kr.updates ?? [])].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )
+      const latest = sorted[0] ?? null
+
+      // For InsightsPanel (flat list)
       sorted.slice(0, 2).forEach(u => {
         if (u.update_text) areaMap[areaName].recentUpdates.push(u.update_text)
       })
+
+      // For AI chat (structured, per-KR)
+      areaMap[areaName].krDetails.push({
+        description:  kr.description,
+        latestUpdate: latest?.update_text ?? null,
+        confidence:   latest?.confidence_score ?? null,
+        updatedAt:    latest?.created_at ?? null,
+        neverUpdated: !latest,
+      })
     }
   }
+
   const areaData: AreaInsightData[] = Object.entries(areaMap).map(([areaName, d]) => ({
     areaName, krs: d.krs, recentUpdates: d.recentUpdates,
   }))
 
-  // --- Build areasPayload for questions API (includes company objective titles) ---
-  const coMap = Object.fromEntries((companyObjectives ?? []).map(co => [co.id, co.title]))
-
-  type ObjWithAlignment = ObjRow & { id: string }
-  const alignmentByArea: Record<string, Set<string>> = {}
-  for (const obj of (areaObjectives ?? []) as unknown as ObjWithAlignment[]) {
-    const areaName = getAreaName(obj)
-    if (!alignmentByArea[areaName]) alignmentByArea[areaName] = new Set()
-    if (obj.aligned_to && coMap[obj.aligned_to]) {
-      alignmentByArea[areaName].add(coMap[obj.aligned_to])
-    }
-  }
-
   const areasPayload = Object.entries(areaMap).map(([areaName, d]) => ({
     areaName,
-    krs: d.krs,
-    recentUpdates: d.recentUpdates,
-    companyObjectives: Array.from(alignmentByArea[areaName] ?? []),
+    krs:              d.krs,
+    recentUpdates:    d.recentUpdates,
+    krDetails:        d.krDetails,
+    companyObjectives: Array.from(d.companyObjectives),
   }))
 
   // --- Build metrics context string (all historical data, grouped by month) ---

@@ -10,8 +10,17 @@ import { cn } from '@/lib/utils'
 import ReactMarkdown from 'react-markdown'
 import { marked } from 'marked'
 
+interface KRDetail {
+  description: string
+  latestUpdate: string | null
+  confidence: number | null
+  updatedAt: string | null
+  neverUpdated: boolean
+}
+
 interface AreaPayload extends AreaInsightData {
   companyObjectives: string[]
+  krDetails?: KRDetail[]
 }
 
 interface ExecutiveClientProps {
@@ -70,10 +79,25 @@ function buildSystemContext(
 
   const areasDetail = areasPayload.length > 0
     ? areasPayload.map(a => {
-        const krs     = a.krs.length > 0 ? a.krs.map(k => `  • ${k}`).join('\n') : '  (no key results set)'
-        const updates = a.recentUpdates.length > 0 ? a.recentUpdates.slice(0, 4).map(u => `  - ${u}`).join('\n') : '  (no recent updates)'
-        const cos     = a.companyObjectives.length > 0 ? a.companyObjectives.map(c => `  → ${c}`).join('\n') : '  (none aligned)'
-        return `**${a.areaName}**\nKey Results:\n${krs}\nRecent Updates:\n${updates}\nAligned Company Objectives:\n${cos}`
+        const cos = a.companyObjectives.length > 0
+          ? a.companyObjectives.map(c => `  → ${c}`).join('\n')
+          : '  (none aligned)'
+
+        let krsSection: string
+        if (a.krDetails && a.krDetails.length > 0) {
+          krsSection = a.krDetails.map(kr => {
+            const conf    = kr.confidence !== null ? `confidence ${kr.confidence}/5` : 'not rated'
+            const date    = kr.updatedAt ? ` (${new Date(kr.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })})` : ''
+            const update  = kr.neverUpdated
+              ? '    Update: never updated'
+              : `    Update${date}: "${kr.latestUpdate ?? ''}"`
+            return `  • ${kr.description}\n    Confidence: ${conf}\n${update}`
+          }).join('\n')
+        } else {
+          krsSection = a.krs.length > 0 ? a.krs.map(k => `  • ${k}`).join('\n') : '  (no key results set)'
+        }
+
+        return `**${a.areaName}**\nAligned to: ${cos}\nKey Results:\n${krsSection}`
       }).join('\n\n')
     : '(No OKR data available for this quarter.)'
 
