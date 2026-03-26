@@ -21,6 +21,7 @@ interface ExecutiveClientProps {
   areas: Area[]
   quarter: number
   year: number
+  metricsContext: string
 }
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string }
@@ -61,6 +62,7 @@ function buildSystemContext(
   areasPayload: AreaPayload[],
   quarter: number,
   year: number,
+  metricsContext: string,
 ): string {
   const flagged = insights.length > 0
     ? insights.map(i => `- [${i.type.toUpperCase()}] ${i.area}: ${i.message}`).join('\n')
@@ -75,7 +77,7 @@ function buildSystemContext(
       }).join('\n\n')
     : '(No OKR data available for this quarter.)'
 
-return `You are the AI Chief of Staff for Ontop, a global payroll and workforce platform. You advise the CEO (Julian) and COO (Cami) directly on Q${quarter} ${year} OKR execution and company performance.
+return `You are the AI Chief of Staff for Ontop, a global payroll and workforce platform. You advise the CEO (Julian) and COO (Cami) directly on Q${quarter} ${year} OKR execution and company performance. You have access to both OKR data and live business metrics — use both when relevant.
 
 Your job:
 - Give sharp, specific, operator-level answers
@@ -104,6 +106,8 @@ If giving a prioritization summary, use exactly this format:
 - Marketing → 🟠 High → Funnel quality broken
 
 Never use markdown tables or pipe-separated layouts.
+
+## ${metricsContext}
 
 ## Flagged Items Requiring Attention (${insights.length} total)
 ${flagged}
@@ -151,7 +155,7 @@ function archiveCurrent(messages: ChatMessage[]) {
 }
 
 export default function ExecutiveClient({
-  insights, areaData, areasPayload, areas, quarter, year,
+  insights, areaData, areasPayload, areas, quarter, year, metricsContext,
 }: ExecutiveClientProps) {
   const [activeTab, setActiveTab] = useState<'chat' | 'insights'>('chat')
 
@@ -357,7 +361,7 @@ export default function ExecutiveClient({
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({
           messages:      newMessages,
-          systemContext: buildSystemContext(insights, areasPayload, quarter, year),
+          systemContext: buildSystemContext(insights, areasPayload, quarter, year, metricsContext),
         }),
       })
 
@@ -454,7 +458,7 @@ export default function ExecutiveClient({
               </div>
               <div>
                 <h2 className="text-base font-semibold text-white">Ask your AI Chief of Staff</h2>
-                <p className="text-xs text-white/40">Full Q{quarter} {year} OKR context loaded · ask anything about any area</p>
+                <p className="text-xs text-white/40">Q{quarter} {year} OKRs + business metrics loaded · ask anything</p>
               </div>
             </div>
             {/* History + New conversation controls */}

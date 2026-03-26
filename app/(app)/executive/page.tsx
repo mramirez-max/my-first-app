@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { getCurrentQuarter } from '@/types'
 import { ComputedInsight, AreaInsightData } from '@/components/admin/InsightsPanel'
 import ExecutiveClient from '@/components/executive/ExecutiveClient'
+import { METRIC_DEFINITIONS, formatMetricValue } from '@/lib/metrics'
 
 export default async function ExecutivePage() {
   const supabase = await createClient()
@@ -19,10 +20,17 @@ export default async function ExecutivePage() {
 
   const { quarter, year } = getCurrentQuarter()
 
+  const now        = new Date()
+  const latestMonth = now.getMonth() + 1
+  const latestYear  = now.getFullYear()
+  const prevMonth   = latestMonth === 1 ? 12 : latestMonth - 1
+  const prevYear    = latestMonth === 1 ? latestYear - 1 : latestYear
+
   const [
     { data: areas },
     { data: companyObjectives },
     { data: areaObjectives },
+    { data: metricsRaw },
   ] = await Promise.all([
     supabase.from('areas').select('*').order('name'),
     supabase
@@ -35,6 +43,10 @@ export default async function ExecutivePage() {
       .select('id, title, area_id, aligned_to, area:areas(name), key_results:area_key_results(id, description, updates:area_kr_updates(confidence_score, update_text, created_at))')
       .eq('quarter', quarter)
       .eq('year', year),
+    supabase
+      .from('business_metrics')
+      .select('metric_name, month, year, value')
+      .or(`and(month.eq.${latestMonth},year.eq.${latestYear}),and(month.eq.${prevMonth},year.eq.${prevYear})`),
   ])
 
   type KRRow = { id: string; description: string; updates: { confidence_score: number; update_text: string; created_at: string }[] }
@@ -118,6 +130,28 @@ export default async function ExecutivePage() {
     companyObjectives: Array.from(alignmentByArea[areaName] ?? []),
   }))
 
+  // --- Build metrics context string ---
+  const getVal = (name: string, m: number, y: number) =>
+    (metricsRaw ?? []).find(r => r.metric_name === name && r.month === m && r.year === y)?.value ?? null
+
+  const metricsLines = METRIC_DEFINITIONS.map(def => {
+    const cur  = getVal(def.name, latestMonth, latestYear)
+    const prev = getVal(def.name, prevMonth, prevYear)
+    if (cur === null) return null
+    const formatted = formatMetricValue(cur, def.format)
+    let delta = ''
+    if (prev !== null && prev !== 0) {
+      const pct = ((cur - prev) / Math.abs(prev)) * 100
+      delta = ` (${pct >= 0 ? '+' : ''}${pct.toFixed(1)}% MoM)`
+    }
+    return `  ${def.name}: ${formatted}${delta}`
+  }).filter(Boolean) as string[]
+
+  const monthLabel = now.toLocaleString('default', { month: 'long' })
+  const metricsContext = metricsLines.length > 0
+    ? `Business Metrics — ${monthLabel} ${latestYear}:\n${metricsLines.join('\n')}`
+    : 'Business Metrics: no data entered yet for this period.'
+
   return (
     <div className="p-8 max-w-5xl mx-auto space-y-8">
       <div>
@@ -136,6 +170,7 @@ export default async function ExecutivePage() {
         areas={areas ?? []}
         quarter={quarter}
         year={year}
+        metricsContext={metricsContext}
       />
     </div>
   )
