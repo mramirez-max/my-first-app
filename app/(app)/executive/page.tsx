@@ -46,7 +46,8 @@ export default async function ExecutivePage() {
     supabase
       .from('business_metrics')
       .select('metric_name, month, year, value')
-      .or(`and(month.eq.${latestMonth},year.eq.${latestYear}),and(month.eq.${prevMonth},year.eq.${prevYear})`),
+      .order('year', { ascending: false })
+      .order('month', { ascending: false }),
   ])
 
   type KRRow = { id: string; description: string; updates: { confidence_score: number; update_text: string; created_at: string }[] }
@@ -130,27 +131,32 @@ export default async function ExecutivePage() {
     companyObjectives: Array.from(alignmentByArea[areaName] ?? []),
   }))
 
-  // --- Build metrics context string ---
-  const getVal = (name: string, m: number, y: number) =>
-    (metricsRaw ?? []).find(r => r.metric_name === name && r.month === m && r.year === y)?.value ?? null
+  // --- Build metrics context string (all historical data, grouped by month) ---
+  const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
-  const metricsLines = METRIC_DEFINITIONS.map(def => {
-    const cur  = getVal(def.name, latestMonth, latestYear)
-    const prev = getVal(def.name, prevMonth, prevYear)
-    if (cur === null) return null
-    const formatted = formatMetricValue(cur, def.format)
-    let delta = ''
-    if (prev !== null && prev !== 0) {
-      const pct = ((cur - prev) / Math.abs(prev)) * 100
-      delta = ` (${pct >= 0 ? '+' : ''}${pct.toFixed(1)}% MoM)`
-    }
-    return `  ${def.name}: ${formatted}${delta}`
-  }).filter(Boolean) as string[]
+  // Group all rows by "Month Year"
+  const byPeriod = new Map<string, typeof metricsRaw>()
+  for (const row of metricsRaw ?? []) {
+    const key = `${MONTH_NAMES[row.month - 1]} ${row.year}`
+    if (!byPeriod.has(key)) byPeriod.set(key, [])
+    byPeriod.get(key)!.push(row)
+  }
 
-  const monthLabel = now.toLocaleString('default', { month: 'long' })
-  const metricsContext = metricsLines.length > 0
-    ? `Business Metrics — ${monthLabel} ${latestYear}:\n${metricsLines.join('\n')}`
-    : 'Business Metrics: no data entered yet for this period.'
+  const metricsContext = byPeriod.size === 0
+    ? 'Business Metrics: no data entered yet.'
+    : Array.from(byPeriod.entries()).map(([period, rows]) => {
+        const lines = METRIC_DEFINITIONS
+          .map(def => {
+            const row = (rows ?? []).find(r => r.metric_name === def.name)
+            if (!row || row.value === null) return null
+            return `  ${def.name}: ${formatMetricValue(row.value, def.format)}`
+          })
+          .filter(Boolean)
+          .join('\n')
+        return lines ? `${period}:\n${lines}` : null
+      })
+      .filter(Boolean)
+      .join('\n\n')
 
   return (
     <div className="p-8 max-w-5xl mx-auto space-y-8">
