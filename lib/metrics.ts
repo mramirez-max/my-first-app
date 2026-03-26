@@ -23,6 +23,7 @@ export const METRIC_DEFINITIONS: MetricDefinition[] = [
   { name: 'MRR',                         category: 'Revenue',             format: 'currency' },
   { name: 'Take Rate',                   category: 'Revenue',             format: 'percent'  },
   { name: 'Total Effective New Revenue', category: 'Revenue',             format: 'currency', aliases: ['total effective', 'total effective new revenue'] },
+  { name: 'New Revenue New Cohort',       category: 'Revenue',             format: 'currency' },
   { name: 'Total MRR HR Business',       category: 'Revenue',             format: 'currency' },
   { name: 'Total Bank Revenue + Yield',  category: 'Revenue',             format: 'currency' },
   // Volume
