@@ -31,6 +31,7 @@ export default async function ExecutivePage() {
     { data: companyObjectives },
     { data: areaObjectives },
     { data: metricsRaw },
+    { data: documents },
   ] = await Promise.all([
     supabase.from('areas').select('*').order('name'),
     supabase
@@ -48,6 +49,11 @@ export default async function ExecutivePage() {
       .select('metric_name, month, year, value')
       .order('year', { ascending: false })
       .order('month', { ascending: false }),
+    supabase
+      .from('company_documents')
+      .select('id, title, doc_type, doc_date, blob_url, summary, created_at')
+      .order('doc_date', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false }),
   ])
 
   type KRRow = { id: string; description: string; updates: { confidence_score: number; update_text: string; created_at: string }[] }
@@ -196,6 +202,8 @@ export default async function ExecutivePage() {
         quarter={quarter}
         year={year}
         metricsContext={metricsContext}
+        documents={documents ?? []}
+        isAdmin={profile?.role === 'admin'}
       />
     </div>
   )

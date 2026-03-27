@@ -5,10 +5,11 @@ import { Button } from '@/components/ui/button'
 import { Area } from '@/types'
 import { ComputedInsight, AreaInsightData } from '@/components/admin/InsightsPanel'
 import InsightsPanel from '@/components/admin/InsightsPanel'
-import { Loader2, Send, CheckCircle2, Bot, User, Sparkles, BarChart2, History, ArrowLeft, Plus, Trash2, Download } from 'lucide-react'
+import { Loader2, Send, CheckCircle2, Bot, User, Sparkles, BarChart2, History, ArrowLeft, Plus, Trash2, Download, FileText } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import ReactMarkdown from 'react-markdown'
 import { marked } from 'marked'
+import DocumentsTab, { type CompanyDocument } from './DocumentsTab'
 
 interface KRDetail {
   description: string
@@ -31,6 +32,8 @@ interface ExecutiveClientProps {
   quarter: number
   year: number
   metricsContext: string
+  documents: CompanyDocument[]
+  isAdmin: boolean
 }
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string }
@@ -72,6 +75,7 @@ function buildSystemContext(
   quarter: number,
   year: number,
   metricsContext: string,
+  documents: CompanyDocument[],
 ): string {
   const flagged = insights.length > 0
     ? insights.map(i => `- [${i.type.toUpperCase()}] ${i.area}: ${i.message}`).join('\n')
@@ -101,7 +105,16 @@ function buildSystemContext(
       }).join('\n\n')
     : '(No OKR data available for this quarter.)'
 
-return `You are the AI Chief of Staff for Ontop, a global payroll and workforce platform. You advise the CEO (Julian) and COO (Cami) directly on Q${quarter} ${year} OKR execution and company performance. You have access to both OKR data and live business metrics — use both when relevant.
+  const docsSection = documents.length > 0
+    ? documents.map(d => {
+        const date = d.doc_date
+          ? new Date(d.doc_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' })
+          : 'undated'
+        return `### ${d.title} (${d.doc_type.replace(/_/g, ' ')} · ${date})\n${d.summary}`
+      }).join('\n\n')
+    : '(No strategic documents uploaded yet.)'
+
+return `You are the AI Chief of Staff for Ontop, a global payroll and workforce platform. You advise the CEO (Julian) and COO (Cami) directly on Q${quarter} ${year} OKR execution and company performance. You have access to OKR data, live business metrics, and strategic documents (board decks, investor updates) — use all of them when relevant.
 
 RESPONSE RULES:
 - Match length to the question. Simple question = short answer. No padding.
@@ -119,6 +132,9 @@ Do NOT add it when:
 - The question is a simple factual lookup — a metric value, a KR status, a date
 - The answer fits in 1–3 lines
 - The question is a trend or comparison with no decision needed
+
+## Strategic Documents
+${docsSection}
 
 ## ${metricsContext}
 
@@ -152,9 +168,9 @@ function archiveCurrent(messages: ChatMessage[]) {
 }
 
 export default function ExecutiveClient({
-  insights, areaData, areasPayload, areas, quarter, year, metricsContext,
+  insights, areaData, areasPayload, areas, quarter, year, metricsContext, documents, isAdmin,
 }: ExecutiveClientProps) {
-  const [activeTab, setActiveTab] = useState<'chat' | 'insights'>('chat')
+  const [activeTab, setActiveTab] = useState<'chat' | 'insights' | 'documents'>('chat')
 
   const [sending, setSending]     = useState(false)
   const [sent, setSent]           = useState(false)
@@ -358,7 +374,7 @@ export default function ExecutiveClient({
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({
           messages:      newMessages,
-          systemContext: buildSystemContext(insights, areasPayload, quarter, year, metricsContext),
+          systemContext: buildSystemContext(insights, areasPayload, quarter, year, metricsContext, documents),
         }),
       })
 
@@ -436,11 +452,29 @@ export default function ExecutiveClient({
             </span>
           )}
         </button>
+        <button onClick={() => setActiveTab('documents')}
+          className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
+            activeTab === 'documents'
+              ? 'bg-gradient-to-br from-[#FF5A70]/80 to-[#4A268C]/80 text-white shadow'
+              : 'text-white/40 hover:text-white/70')}>
+          <FileText size={14} /> Strategic Docs
+          {documents.length > 0 && (
+            <span className={cn('text-xs px-1.5 py-0.5 rounded-full font-medium',
+              activeTab === 'documents' ? 'bg-white/20 text-white' : 'bg-white/8 text-white/50')}>
+              {documents.length}
+            </span>
+          )}
+        </button>
       </div>
 
       {/* Insights panel */}
       {activeTab === 'insights' && (
         <InsightsPanel insights={insights} areaData={areaData} areas={areas} quarter={quarter} year={year} />
+      )}
+
+      {/* Documents tab */}
+      {activeTab === 'documents' && (
+        <DocumentsTab isAdmin={isAdmin} initialDocs={documents} />
       )}
 
       {/* AI Chat */}

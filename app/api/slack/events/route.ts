@@ -72,6 +72,7 @@ async function buildOKRContext(): Promise<string> {
     { data: companyObjectives },
     { data: areaObjectives },
     { data: metricsRaw },
+    { data: documents },
   ] = await Promise.all([
     supabase.from('areas').select('id, name').order('name'),
     supabase.from('company_objectives').select('title').eq('quarter', quarter).eq('year', year),
@@ -85,6 +86,11 @@ async function buildOKRContext(): Promise<string> {
       .select('metric_name, month, year, value')
       .order('year', { ascending: false })
       .order('month', { ascending: false }),
+    supabase
+      .from('company_documents')
+      .select('title, doc_type, doc_date, summary')
+      .order('doc_date', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false }),
   ])
 
   type KRRow  = { description: string; updates: { confidence_score: number; update_text: string; created_at: string }[] }
@@ -181,8 +187,17 @@ async function buildOKRContext(): Promise<string> {
     ? 'No OKRs Set: None'
     : `No OKRs Set: ${missingAreas.join(', ')}`
 
+  const docsSection = (documents ?? []).length > 0
+    ? (documents ?? []).map(d => {
+        const date = d.doc_date
+          ? new Date(d.doc_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' })
+          : 'undated'
+        return `[${d.title} · ${d.doc_type.replace(/_/g, ' ')} · ${date}]\n${d.summary}`
+      }).join('\n\n')
+    : '(none)'
+
   return `You are the AI Chief of Staff for Ontop. Blunt, direct, no fluff.
-You have access to OKR data AND live business metrics. Use both when relevant.
+You have access to OKR data, live business metrics, and strategic documents (board decks, investor updates). Use all of them when relevant.
 
 Answer the question asked. Nothing more.
 
@@ -193,6 +208,9 @@ RULES:
 - If data is missing or unclear, say so in one sentence
 - Numbers and specifics over vague statements
 - If everything is fine, say it in one sentence${calendarLine}
+
+Strategic Documents:
+${docsSection}
 
 Q${quarter} ${year} OKR DATA:
 
