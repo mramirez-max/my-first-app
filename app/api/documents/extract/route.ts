@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import Anthropic from '@anthropic-ai/sdk'
 
+export const maxDuration = 60 // seconds — needed for large PDFs
+
 const EXTRACTION_PROMPT = `You are extracting structured intelligence from a company document for use by an AI Chief of Staff.
 
 Extract a concise, factual summary covering ALL of the following that are present in the document:

@@ -205,8 +205,8 @@ export default function DocumentsTab({ isAdmin, initialDocs }: Props) {
               disabled={!canUpload}
               className="gap-2 bg-gradient-to-r from-[#FF5A70] to-[#4A268C] text-white border-0 hover:opacity-90 disabled:opacity-30"
             >
-              {step === 'uploading'  && <><Loader2 size={13} className="animate-spin" /> Uploading…</>}
-              {step === 'extracting' && <><Loader2 size={13} className="animate-spin" /> Reading with AI…</>}
+              {step === 'uploading'  && <><Loader2 size={13} className="animate-spin" /> Uploading to storage…</>}
+              {step === 'extracting' && <><Loader2 size={13} className="animate-spin" /> AI is reading PDF (up to 60s)…</>}
               {step === 'idle'       && <><FileText size={13} /> Upload & Extract</>}
             </Button>
           </div>
