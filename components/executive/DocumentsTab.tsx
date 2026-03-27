@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef } from 'react'
+import { upload } from '@vercel/blob/client'
 import { Upload, Loader2, FileText, Trash2, ExternalLink, Check, X, ChevronDown, Pencil } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -33,7 +34,7 @@ interface Props {
   initialDocs: CompanyDocument[]
 }
 
-type Step = 'idle' | 'extracting' | 'review' | 'saving'
+type Step = 'idle' | 'uploading' | 'extracting' | 'review' | 'saving'
 
 interface DraftDoc {
   title:    string
@@ -71,17 +72,21 @@ export default function DocumentsTab({ isAdmin, initialDocs }: Props) {
     setStep('extracting')
 
     try {
-      const fd = new FormData()
-      fd.append('file', newFile)
-      const res = await fetch('/api/documents/extract', { method: 'POST', body: fd })
+      // Step 1: Upload file directly from browser to Vercel Blob (bypasses 4.5MB serverless limit)
+      setStep('uploading')
+      const blob = await upload(
+        `documents/${Date.now()}_${newFile.name}`,
+        newFile,
+        { access: 'public', handleUploadUrl: '/api/upload' },
+      )
 
-      const contentType = res.headers.get('content-type') ?? ''
-      if (!contentType.includes('application/json')) {
-        const text = await res.text()
-        setError(`Server error (${res.status}): ${text.slice(0, 120)}`)
-        setStep('idle')
-        return
-      }
+      // Step 2: Extract summary — server fetches from blob URL, no large payload
+      setStep('extracting')
+      const res = await fetch('/api/documents/extract', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ blobUrl: blob.url }),
+      })
 
       const json = await res.json()
       if (!res.ok) {
@@ -89,7 +94,7 @@ export default function DocumentsTab({ isAdmin, initialDocs }: Props) {
         setStep('idle')
         return
       }
-      setDraft({ title: newTitle, doc_type: newType, doc_date: newDate, blob_url: '', summary: json.summary })
+      setDraft({ title: newTitle, doc_type: newType, doc_date: newDate, blob_url: blob.url, summary: json.summary })
       setStep('review')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
@@ -200,8 +205,9 @@ export default function DocumentsTab({ isAdmin, initialDocs }: Props) {
               disabled={!canUpload}
               className="gap-2 bg-gradient-to-r from-[#FF5A70] to-[#4A268C] text-white border-0 hover:opacity-90 disabled:opacity-30"
             >
+              {step === 'uploading'  && <><Loader2 size={13} className="animate-spin" /> Uploading…</>}
               {step === 'extracting' && <><Loader2 size={13} className="animate-spin" /> Reading with AI…</>}
-              {step === 'idle' && <><FileText size={13} /> Upload & Extract</>}
+              {step === 'idle'       && <><FileText size={13} /> Upload & Extract</>}
             </Button>
           </div>
 
