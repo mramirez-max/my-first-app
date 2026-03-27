@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, maxRetries: 5 })
 
     const coList = (companyObjectives ?? [])
       .map((co: { id: string; title: string }, i: number) => `${i + 1}. ID: "${co.id}" — ${co.title}`)

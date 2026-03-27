@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 
-const client = new Anthropic()
+const client = new Anthropic({ maxRetries: 5 })
 
 export async function POST(req: NextRequest) {
   try {

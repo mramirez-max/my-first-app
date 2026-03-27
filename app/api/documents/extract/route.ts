@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
 
   const base64 = pdfBuffer.toString('base64')
 
-  const client = new Anthropic()
+  const client = new Anthropic({ maxRetries: 5 })
   const response = await client.messages.create({
     model:      'claude-sonnet-4-6',
     max_tokens: 1500,

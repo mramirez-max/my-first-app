@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
 
     const pdfBase64 = Buffer.from(await pdfFile.arrayBuffer()).toString('base64')
 
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, maxRetries: 5 })
 
     const krsText = krs
       .map(

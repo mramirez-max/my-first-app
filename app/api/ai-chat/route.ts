@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 
-const client = new Anthropic()
+const client = new Anthropic({ maxRetries: 5 })
 
 export async function POST(request: NextRequest) {
   const { messages, systemContext } = await request.json() as {

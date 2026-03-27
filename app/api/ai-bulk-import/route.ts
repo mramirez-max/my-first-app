@@ -3,7 +3,7 @@ import Anthropic from '@anthropic-ai/sdk'
 
 export const maxDuration = 120
 
-const client = new Anthropic()
+const client = new Anthropic({ maxRetries: 5 })
 
 export interface BulkKRInput {
   description: string
