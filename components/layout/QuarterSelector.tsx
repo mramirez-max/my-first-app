@@ -10,14 +10,23 @@ interface QuarterSelectorProps {
   selectedYear: number
 }
 
-function generateQuarters(fromQ: number, fromY: number, count = 6) {
-  const result = []
+function generateQuarters(fromQ: number, fromY: number, past = 5, future = 2) {
+  const result: { quarter: number; year: number }[] = []
+
+  // Future quarters (newest first, prepended)
   let q = fromQ, y = fromY
-  for (let i = 0; i < count; i++) {
-    result.push({ quarter: q, year: y })
-    q--
-    if (q === 0) { q = 4; y-- }
+  for (let i = 0; i < future; i++) {
+    q++; if (q > 4) { q = 1; y++ }
+    result.unshift({ quarter: q, year: y })
   }
+
+  // Current + past quarters
+  q = fromQ; y = fromY
+  for (let i = 0; i <= past; i++) {
+    result.push({ quarter: q, year: y })
+    q--; if (q === 0) { q = 4; y-- }
+  }
+
   return result
 }
 
@@ -57,13 +66,14 @@ export default function QuarterSelector({
       >
         {quarters.map(({ quarter, year }) => {
           const isCurrent = quarter === currentQuarter && year === currentYear
+          const isFuture  = year > currentYear || (year === currentYear && quarter > currentQuarter)
           return (
             <option
               key={`${quarter}-${year}`}
               value={`${quarter}-${year}`}
               className="bg-[#1c1540] text-white"
             >
-              Q{quarter} {year}{isCurrent ? ' (current)' : ''}
+              Q{quarter} {year}{isCurrent ? ' (current)' : isFuture ? ' (upcoming)' : ''}
             </option>
           )
         })}
