@@ -26,7 +26,9 @@ export default async function AreaPage({
   const sp = await searchParams
   const quarter = sp.q ? parseInt(sp.q) : currentQuarter
   const year = sp.y ? parseInt(sp.y) : currentYear
-  const isCurrentQuarter = quarter === currentQuarter && year === currentYear
+  const isFutureQuarter   = year > currentYear || (year === currentYear && quarter > currentQuarter)
+  const isCurrentQuarter  = quarter === currentQuarter && year === currentYear
+  const isEditable        = isCurrentQuarter || isFutureQuarter
 
   // Look up area by slug: try exact slug match first (e.g., stored slug), then derive from name
   const { data: allAreas } = await supabase.from('areas').select('*')
@@ -88,7 +90,7 @@ export default async function AreaPage({
         companyObjectives={companyObjectives ?? []}
         quarter={quarter}
         year={year}
-        isCurrentQuarter={isCurrentQuarter}
+        isCurrentQuarter={isEditable}
       />
     </div>
   )
