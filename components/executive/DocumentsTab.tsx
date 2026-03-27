@@ -74,6 +74,15 @@ export default function DocumentsTab({ isAdmin, initialDocs }: Props) {
       const fd = new FormData()
       fd.append('file', newFile)
       const res = await fetch('/api/documents/extract', { method: 'POST', body: fd })
+
+      const contentType = res.headers.get('content-type') ?? ''
+      if (!contentType.includes('application/json')) {
+        const text = await res.text()
+        setError(`Server error (${res.status}): ${text.slice(0, 120)}`)
+        setStep('idle')
+        return
+      }
+
       const json = await res.json()
       if (!res.ok) {
         setError(json.error ?? 'Extraction failed')
