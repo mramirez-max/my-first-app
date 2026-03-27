@@ -33,7 +33,7 @@ interface Props {
   initialDocs: CompanyDocument[]
 }
 
-type Step = 'idle' | 'uploading' | 'extracting' | 'review' | 'saving'
+type Step = 'idle' | 'extracting' | 'review' | 'saving'
 
 interface DraftDoc {
   title:    string
@@ -68,33 +68,24 @@ export default function DocumentsTab({ isAdmin, initialDocs }: Props) {
   async function handleUpload() {
     if (!newFile) return
     setError(null)
-
-    // 1. Upload PDF to Vercel Blob
-    setStep('uploading')
-    const fd = new FormData()
-    fd.append('file', newFile)
-    const uploadRes = await fetch('/api/documents/upload', { method: 'POST', body: fd })
-    if (!uploadRes.ok) {
-      const j = await uploadRes.json()
-      setError(j.error ?? 'Upload failed'); setStep('idle'); return
-    }
-    const { url: blobUrl } = await uploadRes.json()
-
-    // 2. Extract summary with Claude
     setStep('extracting')
-    const extractRes = await fetch('/api/documents/extract', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ blobUrl }),
-    })
-    if (!extractRes.ok) {
-      const j = await extractRes.json()
-      setError(j.error ?? 'Extraction failed'); setStep('idle'); return
-    }
-    const { summary } = await extractRes.json()
 
-    setDraft({ title: newTitle, doc_type: newType, doc_date: newDate, blob_url: blobUrl, summary })
-    setStep('review')
+    try {
+      const fd = new FormData()
+      fd.append('file', newFile)
+      const res = await fetch('/api/documents/extract', { method: 'POST', body: fd })
+      const json = await res.json()
+      if (!res.ok) {
+        setError(json.error ?? 'Extraction failed')
+        setStep('idle')
+        return
+      }
+      setDraft({ title: newTitle, doc_type: newType, doc_date: newDate, blob_url: '', summary: json.summary })
+      setStep('review')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong')
+      setStep('idle')
+    }
   }
 
   async function handleSave() {
@@ -200,8 +191,7 @@ export default function DocumentsTab({ isAdmin, initialDocs }: Props) {
               disabled={!canUpload}
               className="gap-2 bg-gradient-to-r from-[#FF5A70] to-[#4A268C] text-white border-0 hover:opacity-90 disabled:opacity-30"
             >
-              {step === 'uploading' && <><Loader2 size={13} className="animate-spin" /> Uploading…</>}
-              {step === 'extracting' && <><Loader2 size={13} className="animate-spin" /> Extracting with AI…</>}
+              {step === 'extracting' && <><Loader2 size={13} className="animate-spin" /> Reading with AI…</>}
               {step === 'idle' && <><FileText size={13} /> Upload & Extract</>}
             </Button>
           </div>

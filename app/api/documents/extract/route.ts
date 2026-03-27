@@ -22,6 +22,7 @@ Extract a concise, factual summary covering ALL of the following that are presen
 
 Format as clean markdown with ## headers for each section. Be specific — use actual names, numbers, and dates from the document. Skip any section that has no relevant content.`
 
+// POST — accepts a PDF file (FormData) and returns an extracted summary
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -30,20 +31,21 @@ export async function POST(request: NextRequest) {
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { blobUrl } = await request.json()
-  if (!blobUrl) return NextResponse.json({ error: 'blobUrl is required' }, { status: 400 })
+  const formData = await request.formData()
+  const file = formData.get('file') as File | null
+  if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
 
-  // Fetch the PDF bytes
-  let pdfBuffer: Buffer
-  try {
-    const res = await fetch(blobUrl)
-    if (!res.ok) throw new Error(`Failed to fetch PDF: ${res.status}`)
-    pdfBuffer = Buffer.from(await res.arrayBuffer())
-  } catch (err) {
-    return NextResponse.json({ error: `Could not fetch PDF: ${(err as Error).message}` }, { status: 400 })
+  if (file.type !== 'application/pdf') {
+    return NextResponse.json({ error: 'Only PDF files are supported' }, { status: 400 })
   }
 
-  const base64 = pdfBuffer.toString('base64')
+  const MAX_SIZE = 20 * 1024 * 1024 // 20 MB
+  if (file.size > MAX_SIZE) {
+    return NextResponse.json({ error: 'File too large (max 20 MB)' }, { status: 400 })
+  }
+
+  const buffer = Buffer.from(await file.arrayBuffer())
+  const base64  = buffer.toString('base64')
 
   const client = new Anthropic()
   const response = await client.messages.create({
