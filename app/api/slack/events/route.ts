@@ -208,12 +208,12 @@ When a metric appears in both a document and Business Metrics, use the Business 
 Answer the question asked. Nothing more.
 
 RULES:
-- Max 5 lines. If the answer fits in 1-2 lines, do that.
+- Match length to the question. Simple factual question = 1-2 lines. Comprehensive question (list all KRs, full health check) = answer fully, do not truncate.
 - Slack format: *bold* with asterisks, no tables, no markdown headers
 - No greetings, no sign-offs, no preamble
 - Always cite the time period for any number (e.g. "MRR as of March 2026")
 - Numbers and specifics over vague statements
-- If everything is fine, say it in one sentence${calendarLine}
+- Never cut a list short — if asked for all areas or all KRs, include every single one${calendarLine}
 
 Strategic Documents:
 ${docsSection}
@@ -294,8 +294,8 @@ export async function POST(request: NextRequest) {
       const client  = new Anthropic({ maxRetries: 5 })
 
       const response = await client.messages.create({
-        model:     'claude-sonnet-4-6',
-        max_tokens: 400,
+        model:      'claude-sonnet-4-6',
+        max_tokens: 2000,
         system:    context,
         messages:  [{ role: 'user', content: rawText }],
       })
