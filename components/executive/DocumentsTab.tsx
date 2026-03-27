@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { upload } from '@vercel/blob/client'
+import { createClient } from '@/lib/supabase/client'
 import { Upload, Loader2, FileText, Trash2, ExternalLink, Check, X, ChevronDown, Pencil } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -72,20 +72,30 @@ export default function DocumentsTab({ isAdmin, initialDocs }: Props) {
     setStep('extracting')
 
     try {
-      // Step 1: Upload file directly from browser to Vercel Blob (bypasses 4.5MB serverless limit)
+      // Step 1: Upload directly from browser to Supabase Storage (bypasses 4.5MB serverless limit)
       setStep('uploading')
-      const blob = await upload(
-        `documents/${Date.now()}_${newFile.name}`,
-        newFile,
-        { access: 'public', handleUploadUrl: '/api/upload' },
-      )
+      const supabase = createClient()
+      const path = `${Date.now()}_${newFile.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+      const { error: uploadError } = await supabase.storage
+        .from('company-documents')
+        .upload(path, newFile, { contentType: 'application/pdf', upsert: false })
 
-      // Step 2: Extract summary — server fetches from blob URL, no large payload
+      if (uploadError) {
+        setError(`Upload failed: ${uploadError.message}`)
+        setStep('idle')
+        return
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('company-documents')
+        .getPublicUrl(path)
+
+      // Step 2: Extract summary — server fetches from storage URL, no large payload
       setStep('extracting')
       const res = await fetch('/api/documents/extract', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ blobUrl: blob.url }),
+        body:    JSON.stringify({ blobUrl: publicUrl }),
       })
 
       const json = await res.json()
@@ -94,7 +104,7 @@ export default function DocumentsTab({ isAdmin, initialDocs }: Props) {
         setStep('idle')
         return
       }
-      setDraft({ title: newTitle, doc_type: newType, doc_date: newDate, blob_url: blob.url, summary: json.summary })
+      setDraft({ title: newTitle, doc_type: newType, doc_date: newDate, blob_url: publicUrl, summary: json.summary })
       setStep('review')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
