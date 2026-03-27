@@ -30,6 +30,44 @@ function verifySlackSignature(req: NextRequest, rawBody: string): boolean {
   }
 }
 
+// --- Message chunking (Slack limit: 3000 chars per message) ------------------
+const SLACK_MAX = 2800 // leave buffer below the 3000 hard limit
+
+function chunkMessage(text: string): string[] {
+  if (text.length <= SLACK_MAX) return [text]
+
+  const chunks: string[] = []
+  const paragraphs = text.split(/\n\n+/)
+  let current = ''
+
+  for (const para of paragraphs) {
+    const candidate = current ? `${current}\n\n${para}` : para
+    if (candidate.length <= SLACK_MAX) {
+      current = candidate
+    } else {
+      // Current paragraph alone exceeds limit — split on newlines
+      if (para.length > SLACK_MAX) {
+        if (current) { chunks.push(current); current = '' }
+        const lines = para.split('\n')
+        for (const line of lines) {
+          const lc = current ? `${current}\n${line}` : line
+          if (lc.length <= SLACK_MAX) {
+            current = lc
+          } else {
+            if (current) chunks.push(current)
+            current = line.slice(0, SLACK_MAX) // hard truncate only as last resort
+          }
+        }
+      } else {
+        if (current) chunks.push(current)
+        current = para
+      }
+    }
+  }
+  if (current) chunks.push(current)
+  return chunks
+}
+
 // --- Slack API helpers -------------------------------------------------------
 const SLACK_API = 'https://slack.com/api'
 
@@ -301,11 +339,18 @@ export async function POST(request: NextRequest) {
       })
 
       const answer = response.content.find(b => b.type === 'text')?.text ?? '_No response generated._'
+      const chunks = chunkMessage(answer)
 
+      // First chunk replaces (or is posted as) the "Thinking..." message
       if (thinkingTs) {
-        await slackUpdate(channel, thinkingTs, answer)
+        await slackUpdate(channel, thinkingTs, chunks[0])
       } else {
-        await slackPost(channel, answer, threadTs)
+        await slackPost(channel, chunks[0], threadTs)
+      }
+
+      // Remaining chunks posted sequentially in the same thread
+      for (const chunk of chunks.slice(1)) {
+        await slackPost(channel, chunk, threadTs)
       }
 
       console.log(`[slack/events] Answered "${rawText.slice(0, 60)}" in ${channel}`)
