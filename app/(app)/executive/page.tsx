@@ -4,8 +4,17 @@ import { getCurrentQuarter } from '@/types'
 import { ComputedInsight, AreaInsightData } from '@/components/admin/InsightsPanel'
 import ExecutiveClient from '@/components/executive/ExecutiveClient'
 import { METRIC_DEFINITIONS, formatMetricValue } from '@/lib/metrics'
+import { type WrapUpObjective } from '@/components/executive/WrapUpTab'
 
-export default async function ExecutivePage() {
+function nextQuarterOf(q: number, y: number) {
+  return q === 4 ? { quarter: 1, year: y + 1 } : { quarter: q + 1, year: y }
+}
+
+export default async function ExecutivePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; y?: string }>
+}) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -18,7 +27,12 @@ export default async function ExecutivePage() {
 
   if (profile?.role !== 'admin') redirect('/')
 
-  const { quarter, year } = getCurrentQuarter()
+  const { quarter: currentQ, year: currentY } = getCurrentQuarter()
+  const params  = await searchParams
+  const quarter = params.q ? parseInt(params.q) : currentQ
+  const year    = params.y ? parseInt(params.y) : currentY
+  const isFutureQuarter = year > currentY || (year === currentY && quarter > currentQ)
+  const { quarter: nextQuarter, year: nextYear } = nextQuarterOf(quarter, year)
 
   const now        = new Date()
   const latestMonth = now.getMonth() + 1
@@ -32,6 +46,7 @@ export default async function ExecutivePage() {
     { data: areaObjectives },
     { data: metricsRaw },
     { data: documents },
+    { data: wrapUpObjectivesRaw },
   ] = await Promise.all([
     supabase.from('areas').select('*').order('name'),
     supabase
@@ -54,6 +69,12 @@ export default async function ExecutivePage() {
       .select('id, title, doc_type, doc_date, blob_url, summary, created_at')
       .order('doc_date', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false }),
+    supabase
+      .from('area_objectives')
+      .select('id, title, area_id, area:areas(name), key_results:area_key_results(id, description, target_value, current_value, unit, owner_id, updates:area_kr_updates(id, confidence_score, current_value, week_date))')
+      .eq('quarter', quarter)
+      .eq('year', year)
+      .order('created_at'),
   ])
 
   type KRRow = { id: string; description: string; updates: { confidence_score: number; update_text: string; created_at: string }[] }
@@ -204,6 +225,10 @@ export default async function ExecutivePage() {
         metricsContext={metricsContext}
         documents={documents ?? []}
         isAdmin={profile?.role === 'admin'}
+        wrapUpObjectives={(wrapUpObjectivesRaw ?? []) as unknown as WrapUpObjective[]}
+        nextQuarter={nextQuarter}
+        nextYear={nextYear}
+        isFutureQuarter={isFutureQuarter}
       />
     </div>
   )

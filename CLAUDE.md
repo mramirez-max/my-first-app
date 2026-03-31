@@ -22,3 +22,92 @@ These defaults are optimized for AI coding agents (and humans) working on apps t
   needed. Always curl https://ai-gateway.vercel.sh/v1/models first; never trust model IDs from memory
 - For durable agent loops or untrusted code: use Workflow (pause/resume/state) + Sandbox; use Vercel MCP for secure infra access
 <!-- VERCEL BEST PRACTICES END -->
+
+# OKR Operating System — Project Guide
+
+Full-stack OKR + AI Chief of Staff app for Ontop. Deployed on Vercel.
+
+## Tech Stack
+- Next.js 15 (App Router) + TypeScript
+- Tailwind CSS + shadcn/ui
+- Supabase (PostgreSQL + Auth + RLS + Storage)
+- Anthropic Claude API (`claude-sonnet-4-6` for chat/extraction, `claude-opus-4-6` for bulk OKR import)
+- Vercel (hosting)
+- Slack API (bot token + signing secret)
+
+## Key Patterns
+
+### Anthropic clients
+Always instantiate with `maxRetries: 5` for 529 overload resilience:
+```ts
+new Anthropic({ maxRetries: 5 })
+```
+
+### PDF uploads
+PDFs go **browser → Supabase Storage** directly (not through Vercel serverless). Vercel has a 4.5MB hard limit on route handler payloads that cannot be overridden. The extract route receives a URL, not file bytes.
+
+### Quarter gating
+```ts
+const isFutureQuarter = year > currentYear || (year === currentYear && quarter > currentQuarter)
+const isEditable = isCurrentQuarter || isFutureQuarter
+```
+Both current and future quarters are editable. Only past quarters are read-only.
+
+### AI data hierarchy (always enforce in prompts)
+1. **Business Metrics** — ground truth for all KPIs (labeled by month/year)
+2. **OKR updates** — qualitative signals: confidence, blockers, weekly progress
+3. **Strategic documents** — context/narrative only; do NOT cite their metrics if Business Metrics has more recent data
+
+### Slack bot
+- Posts "Thinking…" immediately, processes in `after()` to avoid 3s timeout
+- `max_tokens: 2000` — never truncates comprehensive answers
+- Splits long answers into ≤2800-char chunks, posted sequentially in same thread
+
+## Database Migrations
+- `001_initial.sql` — full schema + RLS + seed data
+- `002_business_metrics.sql` — business_metrics table
+- `003_company_documents.sql` — company_documents table
+- `004_documents_storage.sql` — Supabase Storage bucket `company-documents`
+
+## Key Files
+| File | Purpose |
+|------|---------|
+| `lib/metrics.ts` | METRIC_DEFINITIONS, formatMetricValue, MONTH_NAMES |
+| `components/executive/ExecutiveClient.tsx` | AI chat UI + buildSystemContext |
+| `components/executive/DocumentsTab.tsx` | PDF upload → extract → review → save flow |
+| `app/api/slack/events/route.ts` | Slack bot + buildOKRContext + chunkMessage |
+| `app/api/documents/extract/route.ts` | PDF → Claude extraction (maxDuration=60) |
+| `app/api/ai-bulk-import/route.ts` | Bulk OKR import from PDF/text (claude-opus-4-6) |
+| `components/layout/QuarterSelector.tsx` | Quarter dropdown (2 future + 5 past quarters) |
+
+## Route Handlers with Special Config
+```ts
+// app/api/documents/extract/route.ts
+export const maxDuration = 60  // large PDFs need extra time
+```
+
+## Environment Variables (.env.local)
+```
+NEXT_PUBLIC_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY
+ANTHROPIC_API_KEY
+SLACK_BOT_TOKEN
+SLACK_SIGNING_SECRET
+CRON_SECRET
+GOOGLE_CLIENT_ID
+GOOGLE_CLIENT_SECRET
+GOOGLE_CALENDAR_REFRESH_TOKEN
+```
+
+## Roles
+- `admin` — full access, can upload documents, edit all areas
+- `area_lead` — can edit their own area's OKRs
+- `team_member` — read-only
+
+## Quarter Navigation
+URL params: `?q=<1-4>&y=<year>`. `getCurrentQuarter()` in `/types` drives defaults everywhere.
+
+## Users
+- Julian = CEO
+- Cami = COO (also admin)

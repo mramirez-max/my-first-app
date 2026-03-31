@@ -5,11 +5,12 @@ import { Button } from '@/components/ui/button'
 import { Area } from '@/types'
 import { ComputedInsight, AreaInsightData } from '@/components/admin/InsightsPanel'
 import InsightsPanel from '@/components/admin/InsightsPanel'
-import { Loader2, Send, CheckCircle2, Bot, User, Sparkles, BarChart2, History, ArrowLeft, Plus, Trash2, Download, FileText } from 'lucide-react'
+import { Loader2, Send, CheckCircle2, Bot, User, Sparkles, BarChart2, History, ArrowLeft, Plus, Trash2, Download, FileText, ClipboardCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import ReactMarkdown from 'react-markdown'
 import { marked } from 'marked'
 import DocumentsTab, { type CompanyDocument } from './DocumentsTab'
+import WrapUpTab, { type WrapUpObjective } from './WrapUpTab'
 
 interface KRDetail {
   description: string
@@ -34,6 +35,10 @@ interface ExecutiveClientProps {
   metricsContext: string
   documents: CompanyDocument[]
   isAdmin: boolean
+  wrapUpObjectives: WrapUpObjective[]
+  nextQuarter: number
+  nextYear: number
+  isFutureQuarter: boolean
 }
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string }
@@ -177,8 +182,9 @@ function archiveCurrent(messages: ChatMessage[]) {
 
 export default function ExecutiveClient({
   insights, areaData, areasPayload, areas, quarter, year, metricsContext, documents, isAdmin,
+  wrapUpObjectives, nextQuarter, nextYear, isFutureQuarter,
 }: ExecutiveClientProps) {
-  const [activeTab, setActiveTab] = useState<'chat' | 'insights' | 'documents'>('chat')
+  const [activeTab, setActiveTab] = useState<'chat' | 'insights' | 'documents' | 'wrapup'>('chat')
 
   const [sending, setSending]     = useState(false)
   const [sent, setSent]           = useState(false)
@@ -473,6 +479,13 @@ export default function ExecutiveClient({
             </span>
           )}
         </button>
+        <button onClick={() => setActiveTab('wrapup')}
+          className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
+            activeTab === 'wrapup'
+              ? 'bg-gradient-to-br from-[#FF5A70]/80 to-[#4A268C]/80 text-white shadow'
+              : 'text-white/40 hover:text-white/70')}>
+          <ClipboardCheck size={14} /> Quarter Close
+        </button>
       </div>
 
       {/* Insights panel */}
@@ -483,6 +496,19 @@ export default function ExecutiveClient({
       {/* Documents tab */}
       {activeTab === 'documents' && (
         <DocumentsTab isAdmin={isAdmin} initialDocs={documents} />
+      )}
+
+      {/* Quarter Close tab */}
+      {activeTab === 'wrapup' && (
+        <WrapUpTab
+          quarter={quarter}
+          year={year}
+          nextQuarter={nextQuarter}
+          nextYear={nextYear}
+          isFutureQuarter={isFutureQuarter}
+          objectives={wrapUpObjectives}
+          isAdmin={isAdmin}
+        />
       )}
 
       {/* AI Chat */}
