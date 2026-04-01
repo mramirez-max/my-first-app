@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Area, AreaObjective, CompanyObjective, Profile } from '@/types'
 import OKRCard from '@/components/okr/OKRCard'
 import { Button } from '@/components/ui/button'
-import { PlusCircle, Sparkles, Wand2, AlertCircle, FileSpreadsheet } from 'lucide-react'
+import { PlusCircle, Sparkles, Wand2, AlertCircle, FileSpreadsheet, History } from 'lucide-react'
 import ObjectiveDialog from '@/components/okr/ObjectiveDialog'
 import AIUpdateModal from '@/components/okr/AIUpdateModal'
 import AISetupModal from '@/components/okr/AISetupModal'
@@ -18,6 +18,7 @@ interface AreaOKRsClientProps {
   quarter: number
   year: number
   isCurrentQuarter: boolean
+  isPastQuarter?: boolean
 }
 
 export default function AreaOKRsClient({
@@ -28,11 +29,17 @@ export default function AreaOKRsClient({
   quarter,
   year,
   isCurrentQuarter,
+  isPastQuarter = false,
 }: AreaOKRsClientProps) {
   const [showObjectiveDialog, setShowObjectiveDialog] = useState(false)
   const [showAIModal, setShowAIModal] = useState(false)
   const [showAISetupModal, setShowAISetupModal] = useState(false)
+  const [adminPastConfirmed, setAdminPastConfirmed] = useState(false)
   const router = useRouter()
+
+  const isAdmin = profile?.role === 'admin'
+  // Admins can edit past quarters after confirming
+  const effectivelyEditable = isCurrentQuarter || (isPastQuarter && isAdmin && adminPastConfirmed)
 
   function handleRefresh() {
     router.refresh()
@@ -90,12 +97,12 @@ export default function AreaOKRsClient({
     XLSX.writeFile(wb, `${area.name.replace(/ /g, '-')}-OKR-Template-Q${quarter}-${year}.xlsx`)
   }
 
-  const canAddObjective = isCurrentQuarter && (
+  const canAddObjective = effectivelyEditable && (
     profile?.role === 'admin' ||
     (profile?.role === 'area_lead' && profile.area_id === area.id)
   )
 
-  const canUpdate = isCurrentQuarter && (
+  const canUpdate = effectivelyEditable && (
     profile?.role === 'admin' ||
     profile?.role === 'area_lead' ||
     (profile?.role === 'team_member' && profile.area_id === area.id)
@@ -107,11 +114,31 @@ export default function AreaOKRsClient({
   return (
     <div className="space-y-6">
 
-      {/* Past quarter read-only banner */}
-      {!isCurrentQuarter && (
+      {/* Past quarter banners */}
+      {isPastQuarter && !isAdmin && (
         <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-gradient-to-r from-[#1c1540] to-[#23174B] px-4 py-2.5">
           <AlertCircle size={14} className="text-white/40 shrink-0" />
           <p className="text-xs text-white/50">Past quarter — read-only view</p>
+        </div>
+      )}
+      {isPastQuarter && isAdmin && !adminPastConfirmed && (
+        <div className="flex items-center justify-between gap-4 rounded-lg border border-amber-400/25 bg-amber-400/5 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <History size={14} className="text-amber-400 shrink-0" />
+            <p className="text-xs text-amber-300">
+              <span className="font-medium">Q{quarter} {year} is a past quarter.</span> Updates here will be retroactive. Are you sure you want to edit?
+            </p>
+          </div>
+          <Button size="sm" onClick={() => setAdminPastConfirmed(true)}
+            className="shrink-0 bg-amber-400/15 text-amber-300 border border-amber-400/30 hover:bg-amber-400/25 text-xs h-7 px-3">
+            Yes, let me edit
+          </Button>
+        </div>
+      )}
+      {isPastQuarter && isAdmin && adminPastConfirmed && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-400/20 bg-amber-400/5 px-4 py-2.5">
+          <History size={14} className="text-amber-400/60 shrink-0" />
+          <p className="text-xs text-amber-400/60">Editing past quarter Q{quarter} {year} — changes are retroactive</p>
         </div>
       )}
 
@@ -204,7 +231,7 @@ export default function AreaOKRsClient({
           profile={profile}
           companyObjectives={companyObjectives as CompanyObjective[]}
           onRefresh={handleRefresh}
-          isCurrentQuarter={isCurrentQuarter}
+          isCurrentQuarter={effectivelyEditable}
         />
       ))}
 

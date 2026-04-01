@@ -91,6 +91,7 @@ export default async function AreaPage({
         quarter={quarter}
         year={year}
         isCurrentQuarter={isEditable}
+        isPastQuarter={!isEditable}
       />
     </div>
   )
