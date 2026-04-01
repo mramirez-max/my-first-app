@@ -9,6 +9,54 @@ import { METRIC_DEFINITIONS, formatMetricValue } from '@/lib/metrics'
 // --- Deduplication (in-memory, sufficient for serverless retries) -------------
 const processedEvents = new Set<string>()
 
+// --- Slack user name lookup --------------------------------------------------
+async function getSlackUserName(userId: string): Promise<string> {
+  try {
+    const res  = await fetch(`https://slack.com/api/users.info?user=${userId}`, {
+      headers: { Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}` },
+    })
+    const data = await res.json()
+    return data.user?.real_name ?? data.user?.name ?? userId
+  } catch {
+    return userId
+  }
+}
+
+// --- /log command handler ----------------------------------------------------
+async function handleLogCommand(
+  content: string,
+  slackUserId: string,
+  channel: string,
+  threadTs: string,
+  savingTs: string | null,
+): Promise<void> {
+  const supabase = createAdminClient()
+  const now      = new Date()
+  const month    = now.getMonth() + 1
+  const quarter  = Math.ceil(month / 3)
+  const year     = now.getFullYear()
+
+  const [displayName] = await Promise.all([getSlackUserName(slackUserId)])
+
+  const { error } = await supabase.from('decision_logs').insert({
+    content,
+    logged_by:     displayName,
+    slack_user_id: slackUserId,
+    quarter,
+    year,
+  })
+
+  const dateStr  = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  const preview  = content.length > 120 ? content.slice(0, 120) + '…' : content
+
+  const reply = error
+    ? `⚠️ Failed to save log: ${error.message}`
+    : `✅ *Logged to Decision Log*\nQ${quarter} ${year} · ${dateStr} · by ${displayName}\n_"${preview}"_`
+
+  if (savingTs) await slackUpdate(channel, savingTs, reply)
+  else await slackPost(channel, reply, threadTs)
+}
+
 // --- Slack signature verification --------------------------------------------
 function verifySlackSignature(req: NextRequest, rawBody: string): boolean {
   const secret    = process.env.SLACK_SIGNING_SECRET
@@ -116,6 +164,7 @@ async function buildOKRContext(): Promise<string> {
     { data: prevAreaObjectives },
     { data: metricsRaw },
     { data: documents },
+    { data: decisionLogs },
   ] = await Promise.all([
     supabase.from('areas').select('id, name').order('name'),
     supabase.from('company_objectives').select('title').eq('quarter', quarter).eq('year', year),
@@ -139,6 +188,12 @@ async function buildOKRContext(): Promise<string> {
       .select('title, doc_type, doc_date, summary')
       .order('doc_date', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false }),
+    supabase
+      .from('decision_logs')
+      .select('content, logged_by, quarter, year, created_at')
+      .or(`and(quarter.eq.${quarter},year.eq.${year}),and(quarter.eq.${prevQ},year.eq.${prevY})`)
+      .order('created_at', { ascending: false })
+      .limit(50),
   ])
 
   type KRRow     = { description: string; updates: { confidence_score: number; update_text: string; created_at: string }[] }
@@ -236,6 +291,14 @@ async function buildOKRContext(): Promise<string> {
     ? 'No OKRs Set: None'
     : `No OKRs Set: ${missingAreas.join(', ')}`
 
+  const logsSection = (decisionLogs ?? []).length === 0
+    ? '(No decision logs yet. Use /log to capture decisions from calls and checkpoints.)'
+    : (decisionLogs ?? []).map(l => {
+        const date = new Date(l.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        const who  = l.logged_by ? ` · ${l.logged_by}` : ''
+        return `• Q${l.quarter} ${l.year} · ${date}${who}: ${l.content}`
+      }).join('\n')
+
   const docsSection = (documents ?? []).length > 0
     ? (documents ?? []).map(d => {
         const date = d.doc_date
@@ -286,6 +349,9 @@ RULES:
 - Always cite the time period for any number (e.g. "MRR as of March 2026")
 - Numbers and specifics over vague statements
 - Never cut a list short — if asked for all areas or all KRs, include every single one${calendarLine}
+
+Decision Logs (decisions and checkpoint outcomes — most recent first):
+${logsSection}
 
 Strategic Documents:
 ${docsSection}
@@ -357,8 +423,22 @@ export async function POST(request: NextRequest) {
 
   if (!rawText) return NextResponse.json({ ok: true })
 
-  const channel  = event.channel  as string
-  const threadTs = (event.thread_ts ?? event.ts) as string
+  const channel    = event.channel as string
+  const threadTs   = (event.thread_ts ?? event.ts) as string
+  const slackUser  = (event.user as string) ?? ''
+
+  // --- /log command: save decision/checkpoint to the decision log -------------
+  const logMatch = rawText.match(/^\/log\s+([\s\S]+)$/i) ?? rawText.match(/^log:\s*([\s\S]+)$/i)
+  if (logMatch) {
+    const content   = logMatch[1].trim()
+    const savingTs  = await slackPost(channel, '_Saving to Decision Log..._', threadTs)
+    after(async () => {
+      await handleLogCommand(content, slackUser, channel, threadTs, savingTs)
+    })
+    return NextResponse.json({ ok: true })
+  }
+
+  // --- Regular AI question ----------------------------------------------------
 
   // Post "Thinking..." immediately so Slack feels responsive
   const thinkingTs = await slackPost(channel, '_Thinking..._', threadTs)

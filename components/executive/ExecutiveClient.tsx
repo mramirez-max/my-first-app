@@ -25,6 +25,14 @@ interface AreaPayload extends AreaInsightData {
   krDetails?: KRDetail[]
 }
 
+interface DecisionLog {
+  content: string
+  logged_by: string | null
+  quarter: number
+  year: number
+  created_at: string
+}
+
 interface ExecutiveClientProps {
   insights: ComputedInsight[]
   areaData: AreaInsightData[]
@@ -39,6 +47,7 @@ interface ExecutiveClientProps {
   nextQuarter: number
   nextYear: number
   isFutureQuarter: boolean
+  decisionLogs: DecisionLog[]
 }
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string }
@@ -81,6 +90,7 @@ function buildSystemContext(
   year: number,
   metricsContext: string,
   documents: CompanyDocument[],
+  decisionLogs: DecisionLog[],
 ): string {
   const flagged = insights.length > 0
     ? insights.map(i => `- [${i.type.toUpperCase()}] ${i.area}: ${i.message}`).join('\n')
@@ -119,6 +129,13 @@ function buildSystemContext(
       }).join('\n\n')
     : '(No strategic documents uploaded yet.)'
 
+  const logsSection = decisionLogs.length > 0
+    ? decisionLogs.map(l => {
+        const date = new Date(l.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        return `• Q${l.quarter} ${l.year} · ${date}${l.logged_by ? ` · ${l.logged_by}` : ''}: ${l.content}`
+      }).join('\n')
+    : '(No decision logs yet.)'
+
 return `You are the AI Chief of Staff for Ontop, a global payroll and workforce platform. You advise the CEO (Julian) and COO (Cami) directly on Q${quarter} ${year} OKR execution and company performance. You have access to OKR data, live business metrics, and strategic documents (board decks, investor updates) — use all of them when relevant.
 
 DATA HIERARCHY — always follow this when sources conflict:
@@ -145,6 +162,9 @@ Do NOT add it when:
 - The question is a simple factual lookup — a metric value, a KR status, a date
 - The answer fits in 1–3 lines
 - The question is a trend or comparison with no decision needed
+
+## Decision Logs (recent decisions, checkpoint outcomes, call notes)
+${logsSection}
 
 ## Strategic Documents
 ${docsSection}
@@ -182,7 +202,7 @@ function archiveCurrent(messages: ChatMessage[]) {
 
 export default function ExecutiveClient({
   insights, areaData, areasPayload, areas, quarter, year, metricsContext, documents, isAdmin,
-  wrapUpObjectives, nextQuarter, nextYear, isFutureQuarter,
+  wrapUpObjectives, nextQuarter, nextYear, isFutureQuarter, decisionLogs,
 }: ExecutiveClientProps) {
   const [activeTab, setActiveTab] = useState<'chat' | 'insights' | 'documents' | 'wrapup'>('chat')
 
@@ -388,7 +408,7 @@ export default function ExecutiveClient({
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({
           messages:      newMessages,
-          systemContext: buildSystemContext(insights, areasPayload, quarter, year, metricsContext, documents),
+          systemContext: buildSystemContext(insights, areasPayload, quarter, year, metricsContext, documents, decisionLogs),
         }),
       })
 

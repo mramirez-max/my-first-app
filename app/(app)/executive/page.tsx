@@ -34,6 +34,8 @@ export default async function ExecutivePage({
   const year    = params.y ? parseInt(params.y) : currentY
   const isFutureQuarter = year > currentY || (year === currentY && quarter > currentQ)
   const { quarter: nextQuarter, year: nextYear } = nextQuarterOf(quarter, year)
+  const prevLogQ = quarter === 1 ? 4 : quarter - 1
+  const prevLogY = quarter === 1 ? year - 1 : year
 
   const now        = new Date()
   const latestMonth = now.getMonth() + 1
@@ -48,6 +50,7 @@ export default async function ExecutivePage({
     { data: metricsRaw },
     { data: documents },
     { data: wrapUpObjectivesRaw },
+    { data: decisionLogs },
   ] = await Promise.all([
     supabase.from('areas').select('*').order('name'),
     supabase
@@ -76,6 +79,12 @@ export default async function ExecutivePage({
       .eq('quarter', quarter)
       .eq('year', year)
       .order('created_at'),
+    supabase
+      .from('decision_logs')
+      .select('content, logged_by, quarter, year, created_at')
+      .or(`and(quarter.eq.${quarter},year.eq.${year}),and(quarter.eq.${prevLogQ},year.eq.${prevLogY})`)
+      .order('created_at', { ascending: false })
+      .limit(50),
   ])
 
   type KRRow = { id: string; description: string; updates: { confidence_score: number; update_text: string; created_at: string }[] }
@@ -233,6 +242,7 @@ export default async function ExecutivePage({
         nextQuarter={nextQuarter}
         nextYear={nextYear}
         isFutureQuarter={isFutureQuarter}
+        decisionLogs={decisionLogs ?? []}
       />
     </div>
   )
