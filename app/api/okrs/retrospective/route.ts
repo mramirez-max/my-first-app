@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { formatAnthropicError } from '@/lib/anthropic-error'
 
-export const maxDuration = 30
+export const maxDuration = 60
 
 const client = new Anthropic({ maxRetries: 5 })
 
@@ -70,7 +70,7 @@ Be direct. No preamble. No sign-off. No padding.`
 
     const response = await client.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 1200,
+      max_tokens: 800,
       messages: [{ role: 'user', content: prompt }],
     })
 
