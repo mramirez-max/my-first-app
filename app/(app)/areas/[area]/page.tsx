@@ -63,6 +63,16 @@ export default async function AreaPage({
     .eq('year', year)
     .order('created_at')
 
+  // Find the latest KR update across all objectives
+  let lastUpdatedAt: string | null = null
+  for (const obj of objectives ?? []) {
+    for (const kr of (obj.key_results ?? []) as { updates?: { created_at: string }[] }[]) {
+      for (const u of kr.updates ?? []) {
+        if (!lastUpdatedAt || u.created_at > lastUpdatedAt) lastUpdatedAt = u.created_at
+      }
+    }
+  }
+
   return (
     <div className="p-8 max-w-5xl mx-auto space-y-8">
       <div className="flex items-start justify-between gap-4">
@@ -73,7 +83,18 @@ export default async function AreaPage({
           <h1 className="text-3xl font-bold bg-gradient-to-r from-[#FF5A70] to-[#4A268C] bg-clip-text text-transparent">
             {areaName}
           </h1>
-          <p className="text-white/50 mt-1">OKRs for the {areaName} team</p>
+          <p className="text-white/50 mt-1">
+            OKRs for the {areaName} team
+            {lastUpdatedAt && (
+              <span className="ml-3 text-xs text-white/30">
+                · Last update{' '}
+                {new Date(lastUpdatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+              </span>
+            )}
+            {!lastUpdatedAt && (objectives ?? []).length > 0 && (
+              <span className="ml-3 text-xs text-amber-400/60">· No updates yet this quarter</span>
+            )}
+          </p>
         </div>
         <QuarterSelector
           currentQuarter={currentQuarter}
