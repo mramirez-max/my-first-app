@@ -5,6 +5,7 @@ import { ComputedInsight, AreaInsightData } from '@/components/admin/InsightsPan
 import ExecutiveClient from '@/components/executive/ExecutiveClient'
 import { METRIC_DEFINITIONS, formatMetricValue } from '@/lib/metrics'
 import { type WrapUpObjective } from '@/components/executive/WrapUpTab'
+import QuarterSelector from '@/components/layout/QuarterSelector'
 
 function nextQuarterOf(q: number, y: number) {
   return q === 4 ? { quarter: 1, year: y + 1 } : { quarter: q + 1, year: y }
@@ -206,13 +207,16 @@ export default async function ExecutivePage({
 
   return (
     <div className="p-8 max-w-5xl mx-auto space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold bg-gradient-to-r from-[#FF5A70] to-[#4A268C] bg-clip-text text-transparent">
-          Executive View
-        </h1>
-        <p className="text-white/50 mt-1">
-          Q{quarter} {year} · OKR health, risks, and leadership check-in questions
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-[#FF5A70] to-[#4A268C] bg-clip-text text-transparent">
+            Executive View
+          </h1>
+          <p className="text-white/50 mt-1">
+            Q{quarter} {year} · OKR health, risks, and leadership check-in questions
+          </p>
+        </div>
+        <QuarterSelector currentQuarter={currentQ} currentYear={currentY} selectedQuarter={quarter} selectedYear={year} />
       </div>
 
       <ExecutiveClient
