@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { formatAnthropicError } from '@/lib/anthropic-error'
 
 export const maxDuration = 60 // seconds — needed for large PDFs
 
@@ -51,23 +52,27 @@ export async function POST(request: NextRequest) {
   const base64 = pdfBuffer.toString('base64')
 
   const client = new Anthropic({ maxRetries: 5 })
-  const response = await client.messages.create({
-    model:      'claude-sonnet-4-6',
-    max_tokens: 1500,
-    messages: [
-      {
-        role: 'user',
-        content: [
-          {
-            type:   'document',
-            source: { type: 'base64', media_type: 'application/pdf', data: base64 },
-          } as Anthropic.DocumentBlockParam,
-          { type: 'text', text: EXTRACTION_PROMPT },
-        ],
-      },
-    ],
-  })
+  try {
+    const response = await client.messages.create({
+      model:      'claude-sonnet-4-6',
+      max_tokens: 1500,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type:   'document',
+              source: { type: 'base64', media_type: 'application/pdf', data: base64 },
+            } as Anthropic.DocumentBlockParam,
+            { type: 'text', text: EXTRACTION_PROMPT },
+          ],
+        },
+      ],
+    })
 
-  const summary = response.content.find(b => b.type === 'text')?.text ?? ''
-  return NextResponse.json({ summary })
+    const summary = response.content.find(b => b.type === 'text')?.text ?? ''
+    return NextResponse.json({ summary })
+  } catch (err) {
+    return NextResponse.json({ error: formatAnthropicError(err) }, { status: 500 })
+  }
 }

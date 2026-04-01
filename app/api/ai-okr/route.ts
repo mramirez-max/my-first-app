@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { NextRequest } from 'next/server'
+import { formatAnthropicError } from '@/lib/anthropic-error'
 
 export const maxDuration = 60
 
@@ -113,7 +114,7 @@ Instructions:
   } catch (err) {
     console.error('ai-okr error:', err)
     return Response.json(
-      { error: err instanceof Error ? err.message : 'Internal error' },
+      { error: formatAnthropicError(err) },
       { status: 500 },
     )
   }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { formatAnthropicError } from '@/lib/anthropic-error'
 
 export const maxDuration = 120
 
@@ -157,7 +158,7 @@ Extract structured OKRs for each area from the provided document. Rules:
   } catch (err) {
     console.error('Bulk import error:', err)
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Failed to process' },
+      { error: formatAnthropicError(err) },
       { status: 500 }
     )
   }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { formatAnthropicError } from '@/lib/anthropic-error'
 
 export const maxDuration = 120 // 2 minutes for large PDFs
 
@@ -152,7 +153,6 @@ Generate one update per KR. Use the exact KR IDs provided.`,
     return NextResponse.json({ updates: result.updates })
   } catch (error) {
     console.error('AI update error:', error)
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({ error: formatAnthropicError(error) }, { status: 500 })
   }
 }

@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { formatAnthropicError } from '@/lib/anthropic-error'
 
 export const maxDuration = 30
 
@@ -53,12 +54,16 @@ Any themes that appear across multiple areas (e.g., metric-tracking gaps, common
 
 Be direct. No preamble. No sign-off. No padding.`
 
-  const response = await client.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 1200,
-    messages: [{ role: 'user', content: prompt }],
-  })
+  try {
+    const response = await client.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 1200,
+      messages: [{ role: 'user', content: prompt }],
+    })
 
-  const summary = response.content[0].type === 'text' ? response.content[0].text : ''
-  return NextResponse.json({ summary })
+    const summary = response.content[0].type === 'text' ? response.content[0].text : ''
+    return NextResponse.json({ summary })
+  } catch (err) {
+    return NextResponse.json({ error: formatAnthropicError(err) }, { status: 500 })
+  }
 }

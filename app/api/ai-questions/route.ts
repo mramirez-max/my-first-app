@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { formatAnthropicError } from '@/lib/anthropic-error'
 
 const client = new Anthropic({ maxRetries: 5 })
 
@@ -66,7 +67,6 @@ Return ONLY valid JSON in this exact format:
     const questions = JSON.parse(jsonMatch[0])
     return NextResponse.json({ questions })
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    return NextResponse.json({ error: message, questions: [] }, { status: 500 })
+    return NextResponse.json({ error: formatAnthropicError(err), questions: [] }, { status: 500 })
   }
 }
