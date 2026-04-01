@@ -135,8 +135,12 @@ export default function WrapUpTab({
       const res = await fetch('/api/okrs/retrospective', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ objectives, quarter, year }),
+        body:    JSON.stringify({ quarter, year }),
       })
+      const ct = res.headers.get('content-type') ?? ''
+      if (!ct.includes('application/json')) {
+        throw new Error(`Server error (${res.status}) — please try again`)
+      }
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? `Error ${res.status}`)
       setRetroText(data.summary)

@@ -13,18 +13,31 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { objectives, quarter, year } = await req.json()
+    const { quarter, year } = await req.json()
+    if (!quarter || !year) return NextResponse.json({ error: 'quarter and year are required' }, { status: 400 })
+
+    // Fetch objectives + KRs + updates directly — avoids sending large payload from client
+    const { data: objectives, error: dbError } = await supabase
+      .from('area_objectives')
+      .select('title, area:areas(name), key_results:area_key_results(description, target_value, current_value, updates:area_kr_updates(confidence_score, week_date))')
+      .eq('quarter', quarter)
+      .eq('year', year)
+      .order('created_at')
+
+    if (dbError) return NextResponse.json({ error: dbError.message }, { status: 500 })
 
     const nextQ = quarter === 4 ? 1 : quarter + 1
     const nextY = quarter === 4 ? year + 1 : year
 
-    const perfSummary = (objectives ?? []).map((obj: {
-      title: string
-      area?: { name: string } | null
-      key_results?: { description: string; target_value: number; current_value: number; updates: { confidence_score: number; week_date: string }[] }[]
-    }) => {
-      const areaName = obj.area?.name ?? 'Unknown'
-      const krs = (obj.key_results ?? []).map(kr => {
+    const perfSummary = (objectives ?? []).map((obj) => {
+      const area = obj.area as unknown as { name: string } | null
+      const areaName = area?.name ?? 'Unknown'
+      const krs = (obj.key_results as {
+        description: string
+        target_value: number
+        current_value: number
+        updates: { confidence_score: number; week_date: string }[]
+      }[] ?? []).map(kr => {
         const p = kr.target_value > 0 ? Math.round((kr.current_value / kr.target_value) * 100) : 0
         const status = p >= 100 ? 'Met' : p >= 50 ? 'Partial' : 'Missed'
         const latestConf = kr.updates?.length > 0
