@@ -98,6 +98,10 @@ async function buildOKRContext(): Promise<string> {
   const supabase          = createAdminClient()
   const { quarter, year } = getCurrentQuarter()
 
+  // Previous quarter (for retroactive updates and quarter-close context)
+  const prevQ = quarter === 1 ? 4 : quarter - 1
+  const prevY = quarter === 1 ? year - 1 : year
+
   // Latest month with metrics data
   const now = new Date()
   const latestMonth = now.getMonth() + 1
@@ -109,6 +113,7 @@ async function buildOKRContext(): Promise<string> {
     { data: areas },
     { data: companyObjectives },
     { data: areaObjectives },
+    { data: prevAreaObjectives },
     { data: metricsRaw },
     { data: documents },
   ] = await Promise.all([
@@ -119,6 +124,11 @@ async function buildOKRContext(): Promise<string> {
       .select('area_id, area:areas(name), key_results:area_key_results(description, updates:area_kr_updates(confidence_score, update_text, created_at))')
       .eq('quarter', quarter)
       .eq('year', year),
+    supabase
+      .from('area_objectives')
+      .select('area_id, area:areas(name), key_results:area_key_results(description, target_value, current_value, updates:area_kr_updates(confidence_score, update_text, created_at))')
+      .eq('quarter', prevQ)
+      .eq('year', prevY),
     supabase
       .from('business_metrics')
       .select('metric_name, month, year, value')
@@ -131,8 +141,9 @@ async function buildOKRContext(): Promise<string> {
       .order('created_at', { ascending: false }),
   ])
 
-  type KRRow  = { description: string; updates: { confidence_score: number; update_text: string; created_at: string }[] }
-  type ObjRow = { area_id: string; area: unknown; key_results: unknown }
+  type KRRow     = { description: string; updates: { confidence_score: number; update_text: string; created_at: string }[] }
+  type KRRowFull = KRRow & { target_value: number; current_value: number }
+  type ObjRow    = { area_id: string; area: unknown; key_results: unknown }
 
   const getAreaName = (o: ObjRow) => (o.area as { name?: string } | null)?.name ?? 'Unknown'
   const getKRs      = (o: ObjRow): KRRow[] => (o.key_results as KRRow[]) ?? []
@@ -234,6 +245,29 @@ async function buildOKRContext(): Promise<string> {
       }).join('\n\n')
     : '(none)'
 
+  // Previous quarter summary (includes retroactive updates)
+  const prevQDetail = (prevAreaObjectives ?? []).length === 0
+    ? '(No OKR data recorded for this quarter.)'
+    : (prevAreaObjectives ?? []).reduce<Record<string, string[]>>((acc, obj) => {
+        const o    = obj as unknown as ObjRow
+        const name = getAreaName(o)
+        if (!acc[name]) acc[name] = []
+        for (const kr of (o.key_results as KRRowFull[]) ?? []) {
+          const sorted  = (kr.updates ?? []).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+          const latest  = sorted[0] ?? null
+          const conf    = latest ? `${latest.confidence_score}/5` : 'not rated'
+          const pct     = kr.target_value > 0 ? Math.round((kr.current_value / kr.target_value) * 100) : 0
+          const status  = pct >= 100 ? 'Met' : pct >= 50 ? 'Partial' : 'Missed'
+          const note    = latest ? `"${latest.update_text ?? ''}"` : 'never updated'
+          acc[name].push(`  KR: ${kr.description}\n  Achievement: ${pct}% (${status}) | Confidence: ${conf}\n  Last update: ${note}`)
+        }
+        return acc
+      }, {})
+
+  const prevQSection = typeof prevQDetail === 'string'
+    ? prevQDetail
+    : Object.entries(prevQDetail).map(([name, krs]) => `*${name}*\n${krs.join('\n\n')}`).join('\n\n')
+
   return `You are the AI Chief of Staff for Ontop. Blunt, direct, no fluff.
 You have access to OKR data, live business metrics, and strategic documents (board decks, investor updates). Use all of them when relevant.
 
@@ -270,7 +304,11 @@ ${staleSection}
 ${missingSection}
 
 Area Detail:
-${areaDetail}`
+${areaDetail}
+
+---
+Q${prevQ} ${prevY} OKR DATA (previous quarter — includes any retroactive updates):
+${prevQSection}`
 }
 
 // --- Route handler -----------------------------------------------------------
