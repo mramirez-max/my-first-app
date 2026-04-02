@@ -190,16 +190,17 @@ export default function AIUpdateModal({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-3xl w-full max-h-[90vh] overflow-y-auto overflow-x-hidden bg-[#1c1540] border-white/10">
+      {/* sm:max-w-3xl overrides the base sm:max-w-sm from DialogContent; p-6 overrides base p-4 */}
+      <DialogContent className="sm:max-w-3xl w-full max-h-[90vh] overflow-y-auto bg-[#1c1540] border-white/10 p-6 gap-5">
         <DialogHeader>
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-[#FF5A70]/15 flex items-center justify-center">
-              <Sparkles size={16} className="text-[#FF5A70]" />
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-[#FF5A70]/15 flex items-center justify-center shrink-0">
+              <Sparkles size={17} className="text-[#FF5A70]" />
             </div>
             <div>
-              <DialogTitle className="text-white">AI Weekly Update</DialogTitle>
+              <DialogTitle className="text-white text-base">AI Weekly Update</DialogTitle>
               <DialogDescription className="text-xs text-white/50 mt-0.5">
-                Upload a PDF report and Claude will generate updates for all {areaName} key results
+                Upload a PDF report — Claude will generate updates for all {areaName} key results
               </DialogDescription>
             </div>
           </div>
@@ -207,21 +208,21 @@ export default function AIUpdateModal({
 
         {/* Step: Upload */}
         {step === 'upload' && (
-          <div className="space-y-4 mt-2">
+          <div className="space-y-5">
             {allKRs.length === 0 ? (
-              <div className="text-center py-8 text-white/40">
-                <AlertCircle size={32} className="mx-auto mb-2 text-white/20" />
+              <div className="text-center py-10 text-white/40">
+                <AlertCircle size={32} className="mx-auto mb-3 text-white/20" />
                 <p className="text-sm">No key results found. Add some KRs first.</p>
               </div>
             ) : (
               <>
-                <div className="text-xs text-white/50 bg-white/5 rounded-lg p-3">
-                  <p className="font-medium text-white/70 mb-1">Will generate updates for {allKRs.length} key results:</p>
-                  <ul className="space-y-0.5">
+                <div className="text-xs text-white/50 bg-white/5 rounded-xl p-4">
+                  <p className="font-medium text-white/70 mb-2">Will generate updates for {allKRs.length} key results:</p>
+                  <ul className="space-y-1">
                     {allKRs.map(kr => (
-                      <li key={kr.id} className="flex items-start gap-1.5">
+                      <li key={kr.id} className="flex items-start gap-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-[#FF5A70] mt-1.5 shrink-0" />
-                        <span className="break-words">{kr.description}</span>
+                        <span>{kr.description}</span>
                       </li>
                     ))}
                   </ul>
@@ -230,7 +231,7 @@ export default function AIUpdateModal({
                 {/* Drop zone */}
                 <div
                   className={cn(
-                    'border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors',
+                    'border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-colors',
                     dragOver ? 'border-[#FF5A70] bg-[#FF5A70]/10' : 'border-white/15 hover:border-[#FF5A70]/50 hover:bg-white/4',
                     pdfFile ? 'border-[#FF5A70] bg-[#FF5A70]/10' : ''
                   )}
@@ -248,7 +249,7 @@ export default function AIUpdateModal({
                   />
                   {pdfFile ? (
                     <div className="flex flex-col items-center gap-2">
-                      <FileText size={32} className="text-[#FF5A70]" />
+                      <FileText size={34} className="text-[#FF5A70]" />
                       <p className="text-sm font-medium text-[#FF5A70]">{pdfFile.name}</p>
                       <p className="text-xs text-[#FF5A70]/70">
                         {(pdfFile.size / 1024 / 1024).toFixed(2)} MB · Click to change
@@ -256,7 +257,7 @@ export default function AIUpdateModal({
                     </div>
                   ) : (
                     <div className="flex flex-col items-center gap-2">
-                      <Upload size={32} className="text-white/20" />
+                      <Upload size={34} className="text-white/20" />
                       <p className="text-sm font-medium text-white/60">Drop your PDF here</p>
                       <p className="text-xs text-white/40">or click to browse · Weekly report, meeting notes, etc.</p>
                     </div>
@@ -264,12 +265,12 @@ export default function AIUpdateModal({
                 </div>
 
                 {error && (
-                  <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 p-2 rounded flex items-center gap-1.5">
-                    <AlertCircle size={14} /> {error}
+                  <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 px-3 py-2.5 rounded-lg flex items-center gap-2">
+                    <AlertCircle size={14} className="shrink-0" /> {error}
                   </p>
                 )}
 
-                <div className="flex gap-2">
+                <div className="flex gap-3">
                   <Button
                     variant="outline"
                     onClick={handleClose}
@@ -293,30 +294,26 @@ export default function AIUpdateModal({
 
         {/* Step: Generating */}
         {step === 'generating' && (
-          <div className="flex flex-col items-center justify-center py-12 space-y-4">
+          <div className="flex flex-col items-center justify-center py-16 space-y-5">
             <div className="w-16 h-16 rounded-2xl bg-[#FF5A70]/15 flex items-center justify-center">
               <Loader2 size={28} className="text-[#FF5A70] animate-spin" />
             </div>
             <div className="text-center">
               <p className="text-base font-semibold text-white">Analyzing your document...</p>
-              <p className="text-sm text-white/50 mt-1">
+              <p className="text-sm text-white/50 mt-1.5">
                 Claude is reading the PDF and generating updates for {allKRs.length} key results
               </p>
-            </div>
-            <div className="w-full max-w-xs space-y-1 pt-2">
-              <p className="text-xs text-white/40 text-center">This usually takes 15–30 seconds</p>
+              <p className="text-xs text-white/30 mt-3">This usually takes 15–30 seconds</p>
             </div>
           </div>
         )}
 
         {/* Step: Preview */}
         {step === 'preview' && (
-          <div className="space-y-4 mt-2">
+          <div className="space-y-5">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-white/70">
-                Review and edit before saving
-              </p>
-              <Badge variant="secondary" className="gap-1 text-xs bg-[#FF5A70]/10 text-[#FF5A70] border-0">
+              <p className="text-sm font-medium text-white/70">Review and edit before saving</p>
+              <Badge variant="secondary" className="gap-1.5 text-xs bg-[#FF5A70]/10 text-[#FF5A70] border-0 px-2.5">
                 <Sparkles size={10} /> AI Generated
               </Badge>
             </div>
@@ -340,24 +337,25 @@ export default function AIUpdateModal({
 
                 return (
                   <div key={update.keyResultId} className={cn(
-                    'border rounded-xl p-4 space-y-3 transition-all',
+                    'border rounded-2xl p-5 space-y-4 transition-all',
                     matchConf === 'high' && !isExcluded  ? 'border-white/8 bg-gradient-to-br from-[#1c1540] to-[#23174B]' : '',
-                    matchConf === 'low'  && !isExcluded  ? 'border-l-4 border-l-amber-400/60 border-white/8 bg-gradient-to-br from-[#1c1540] to-[#23174B]' : '',
-                    matchConf === 'none' && !isExcluded  ? 'border-l-4 border-l-white/20 border-white/8 bg-[#13102a]' : '',
+                    matchConf === 'low'  && !isExcluded  ? 'border-white/8 border-l-4 border-l-amber-400/60 bg-gradient-to-br from-[#1c1540] to-[#23174B]' : '',
+                    matchConf === 'none' && !isExcluded  ? 'border-white/8 border-l-4 border-l-red-500/50 bg-[#13102a]' : '',
                     isExcluded                           ? 'border-white/5 bg-white/2 opacity-50' : '',
                   )}>
-                    {/* KR header */}
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-xs text-white/40 mb-0.5">{kr.objective_title}</p>
-                        <p className="text-sm font-semibold text-white">{kr.description}</p>
+
+                    {/* KR header row */}
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0 flex-1 space-y-1.5">
+                        <p className="text-xs text-white/40 font-medium uppercase tracking-wide">{kr.objective_title}</p>
+                        <p className="text-sm font-semibold text-white leading-snug">{kr.description}</p>
                         {matchConf === 'low' && (
-                          <span className="inline-flex mt-1 text-xs px-2 py-0.5 rounded-full bg-amber-400/10 text-amber-400 border border-amber-400/25 whitespace-nowrap w-fit">
+                          <span className="inline-flex items-center text-xs px-2.5 py-0.5 rounded-full bg-amber-400/10 text-amber-400 border border-amber-400/25 whitespace-nowrap w-fit">
                             Weak match — limited signal in report
                           </span>
                         )}
                         {matchConf === 'none' && (
-                          <span className="inline-flex mt-1 text-xs px-2 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/25 whitespace-nowrap w-fit">
+                          <span className="inline-flex items-center text-xs px-2.5 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/25 whitespace-nowrap w-fit">
                             Not reported in this PDF
                           </span>
                         )}
@@ -367,42 +365,42 @@ export default function AIUpdateModal({
                         onClick={toggleExclude}
                         title={isExcluded ? 'Include in save' : 'Exclude from save'}
                         className={cn(
-                          'shrink-0 flex items-center gap-1 text-xs px-2 py-1 rounded-lg border transition-colors',
+                          'shrink-0 flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-colors',
                           isExcluded
                             ? 'border-white/15 text-white/30 hover:text-white/60 hover:border-white/25'
                             : 'border-white/15 text-white/50 hover:text-white/80 hover:border-white/25',
                         )}
                       >
-                        {isExcluded ? <EyeOff size={11} /> : <Eye size={11} />}
+                        {isExcluded ? <EyeOff size={12} /> : <Eye size={12} />}
                         {isExcluded ? 'Excluded' : 'Include'}
                       </button>
                     </div>
 
-                    {/* Progress */}
-                    <div className="space-y-1">
+                    {/* Progress bar */}
+                    <div className="space-y-1.5">
                       <div className="flex justify-between text-xs text-white/40">
                         <span>
-                          {update.currentValue.toLocaleString()}
-                          {kr.unit ? ` ${kr.unit}` : ''} / {kr.target_value.toLocaleString()}
-                          {kr.unit ? ` ${kr.unit}` : ''}
+                          {update.currentValue.toLocaleString()}{kr.unit ? ` ${kr.unit}` : ''}
+                          {' / '}
+                          {kr.target_value.toLocaleString()}{kr.unit ? ` ${kr.unit}` : ''}
                         </span>
-                        <span className="font-medium">{progress}%</span>
+                        <span className="font-semibold text-white/60">{progress}%</span>
                       </div>
                       <Progress value={progress} className="h-1.5" />
                     </div>
 
-                    {/* Confidence + current value — stacked to avoid overflow */}
-                    <div className="space-y-3">
-                      <div className="space-y-1">
-                        <p className="text-xs text-white/50">Confidence</p>
-                        <div className="flex gap-1 flex-wrap">
+                    {/* Confidence + current value — side by side */}
+                    <div className="grid grid-cols-2 gap-5">
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-white/40 uppercase tracking-wide">Confidence</p>
+                        <div className="flex gap-1.5">
                           {[1, 2, 3, 4, 5].map(n => (
                             <button
                               key={n}
                               type="button"
                               onClick={() => updateField(update.keyResultId, 'confidenceScore', n)}
                               className={cn(
-                                'w-8 h-8 rounded text-xs font-bold border transition-colors',
+                                'w-9 h-9 rounded-lg text-sm font-bold border transition-colors',
                                 update.confidenceScore === n
                                   ? 'bg-[#FF5A70] text-white border-[#FF5A70]'
                                   : 'bg-white/5 text-white/40 border-white/10 hover:border-[#FF5A70]/50'
@@ -413,8 +411,8 @@ export default function AIUpdateModal({
                           ))}
                         </div>
                       </div>
-                      <div>
-                        <p className="text-xs text-white/50 mb-1">Current value</p>
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-white/40 uppercase tracking-wide">Current value</p>
                         <Input
                           type="number"
                           step="any"
@@ -422,24 +420,25 @@ export default function AIUpdateModal({
                           onChange={e =>
                             updateField(update.keyResultId, 'currentValue', parseFloat(e.target.value) || 0)
                           }
-                          className="h-8 text-sm bg-white/5 border-white/10 text-white focus:border-[#FF5A70]/50"
+                          className="h-9 text-sm bg-white/5 border-white/10 text-white focus:border-[#FF5A70]/50"
                         />
                       </div>
                     </div>
 
-                    <p className={cn('text-xs px-2 py-1.5 rounded border break-words leading-relaxed', conf.color)}>
-                      <span className="font-medium">{conf.label}</span> · {update.reasoning}
+                    {/* Reasoning */}
+                    <p className={cn('text-xs px-3 py-2.5 rounded-lg border leading-relaxed', conf.color)}>
+                      <span className="font-semibold">{conf.label}</span> · {update.reasoning}
                     </p>
 
                     {/* Update text */}
-                    <div className="space-y-1">
-                      <p className="text-xs text-white/50">Update text</p>
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-white/40 uppercase tracking-wide">Update text</p>
                       <Textarea
                         value={update.updateText}
                         onChange={e =>
                           updateField(update.keyResultId, 'updateText', e.target.value)
                         }
-                        rows={3}
+                        rows={4}
                         className="text-sm resize-none bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[#FF5A70]/50"
                       />
                     </div>
@@ -450,20 +449,20 @@ export default function AIUpdateModal({
 
             {/* Unmatched topics + suggested questions */}
             {unmatchedTopics.length > 0 && (
-              <div className="rounded-xl border border-[#4A268C]/40 bg-[#4A268C]/10 p-4 space-y-3">
-                <div className="flex items-center gap-2">
-                  <MessageSquare size={14} className="text-[#a78bfa] shrink-0" />
+              <div className="rounded-2xl border border-[#4A268C]/40 bg-[#4A268C]/10 p-5 space-y-4">
+                <div className="flex items-center gap-2.5">
+                  <MessageSquare size={15} className="text-[#a78bfa] shrink-0" />
                   <p className="text-sm font-semibold text-[#a78bfa]">
                     Topics reported but not in stored OKRs
                   </p>
                 </div>
-                <p className="text-xs text-white/40">
+                <p className="text-xs text-white/40 leading-relaxed">
                   These topics appeared in the report but don't match any stored key result.
-                  Suggested questions for your next sync with the area lead — edit before using.
+                  Edit the suggested questions below before using in your next sync with the area lead.
                 </p>
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {unmatchedTopics.map((topic, i) => (
-                    <div key={i} className="space-y-1.5">
+                    <div key={i} className={cn('space-y-2', i < unmatchedTopics.length - 1 ? 'pb-4 border-b border-white/8' : '')}>
                       <p className="text-xs font-semibold text-white/80">{topic.title}</p>
                       <p className="text-xs text-white/50 leading-relaxed">{topic.summary}</p>
                       <Textarea
@@ -479,15 +478,15 @@ export default function AIUpdateModal({
             )}
 
             {error && (
-              <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 p-2 rounded flex items-center gap-1.5">
-                <AlertCircle size={14} /> {error}
+              <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 px-3 py-2.5 rounded-lg flex items-center gap-2">
+                <AlertCircle size={14} className="shrink-0" /> {error}
               </p>
             )}
 
             {(() => {
               const saveCount = updates.filter(u => !excluded.has(u.keyResultId)).length
               return (
-                <div className="flex gap-2 pt-1">
+                <div className="flex gap-3 pt-1">
                   <Button
                     variant="outline"
                     onClick={() => setStep('upload')}
@@ -503,7 +502,7 @@ export default function AIUpdateModal({
                     <Check size={14} />
                     Save {saveCount} Update{saveCount !== 1 ? 's' : ''}
                     {excluded.size > 0 && (
-                      <span className="text-white/60 text-xs">({excluded.size} excluded)</span>
+                      <span className="text-white/60 text-xs font-normal">({excluded.size} excluded)</span>
                     )}
                   </Button>
                 </div>
@@ -514,8 +513,8 @@ export default function AIUpdateModal({
 
         {/* Step: Saving */}
         {step === 'saving' && (
-          <div className="flex flex-col items-center justify-center py-12 space-y-3">
-            <Loader2 size={28} className="text-[#FF5A70] animate-spin" />
+          <div className="flex flex-col items-center justify-center py-16 space-y-4">
+            <Loader2 size={30} className="text-[#FF5A70] animate-spin" />
             <p className="text-sm text-white/60">Saving updates...</p>
           </div>
         )}
