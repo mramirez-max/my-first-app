@@ -260,7 +260,9 @@ export default function AreaOKRsClient({
         open={showAIModal}
         onClose={() => setShowAIModal(false)}
         areaName={area.name}
+        areaId={area.id}
         objectives={objectives}
+        companyObjectives={companyObjectives}
         onSuccess={handleRefresh}
       />
 

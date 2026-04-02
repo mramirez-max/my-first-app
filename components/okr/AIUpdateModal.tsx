@@ -16,14 +16,18 @@ import { Progress } from '@/components/ui/progress'
 import { AreaObjective, calcProgress } from '@/types'
 import { createClient } from '@/lib/supabase/client'
 import { KRInput, KRUpdate, UnmatchedTopic } from '@/app/api/ai-update/route'
-import { Upload, FileText, Sparkles, Check, AlertCircle, Loader2, MessageSquare, Eye, EyeOff } from 'lucide-react'
+import { Upload, FileText, Sparkles, Check, AlertCircle, Loader2, MessageSquare, Plus, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import ObjectiveDialog from './ObjectiveDialog'
+import { CompanyObjective } from '@/types'
 
 interface AIUpdateModalProps {
   open: boolean
   onClose: () => void
   areaName: string
+  areaId: string
   objectives: AreaObjective[]
+  companyObjectives: Pick<CompanyObjective, 'id' | 'title'>[]
   onSuccess: () => void
 }
 
@@ -41,7 +45,9 @@ export default function AIUpdateModal({
   open,
   onClose,
   areaName,
+  areaId,
   objectives,
+  companyObjectives,
   onSuccess,
 }: AIUpdateModalProps) {
   const supabase = createClient()
@@ -55,6 +61,7 @@ export default function AIUpdateModal({
   const [unmatchedTopics, setUnmatchedTopics] = useState<UnmatchedTopic[]>([])
   const [excluded, setExcluded] = useState<Set<string>>(new Set())
   const [editedQuestions, setEditedQuestions] = useState<Record<string, string>>({})
+  const [createOKRTopic, setCreateOKRTopic] = useState<UnmatchedTopic | null>(null)
 
   // Flatten all KRs from all objectives
   const allKRs: KRInput[] = objectives.flatMap(obj =>
@@ -312,8 +319,11 @@ export default function AIUpdateModal({
         {step === 'preview' && (
           <div className="space-y-5">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-white/70">Review and edit before saving</p>
-              <Badge variant="secondary" className="gap-1.5 text-xs bg-[#FF5A70]/10 text-[#FF5A70] border-0 px-2.5">
+              <div>
+                <p className="text-sm font-medium text-white/70">Review and edit before saving</p>
+                <p className="text-xs text-white/35 mt-0.5">KRs not found in this report are skipped by default — toggle to save anyway</p>
+              </div>
+              <Badge variant="secondary" className="gap-1.5 text-xs bg-[#FF5A70]/10 text-[#FF5A70] border-0 px-2.5 shrink-0">
                 <Sparkles size={10} /> AI Generated
               </Badge>
             </div>
@@ -363,16 +373,17 @@ export default function AIUpdateModal({
                       <button
                         type="button"
                         onClick={toggleExclude}
-                        title={isExcluded ? 'Include in save' : 'Exclude from save'}
+                        title={isExcluded ? 'Click to save this update' : 'Click to skip saving this update'}
                         className={cn(
                           'shrink-0 flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-colors',
                           isExcluded
-                            ? 'border-white/15 text-white/30 hover:text-white/60 hover:border-white/25'
-                            : 'border-white/15 text-white/50 hover:text-white/80 hover:border-white/25',
+                            ? 'border-white/15 text-white/30 hover:text-white/55 hover:border-white/25'
+                            : 'border-emerald-500/30 text-emerald-400 bg-emerald-500/8 hover:bg-emerald-500/15',
                         )}
                       >
-                        {isExcluded ? <EyeOff size={12} /> : <Eye size={12} />}
-                        {isExcluded ? 'Excluded' : 'Include'}
+                        {isExcluded
+                          ? <><X size={11} /> Skip</>
+                          : <><Check size={11} /> Saving</>}
                       </button>
                     </div>
 
@@ -462,15 +473,27 @@ export default function AIUpdateModal({
                 </p>
                 <div className="space-y-4">
                   {unmatchedTopics.map((topic, i) => (
-                    <div key={i} className={cn('space-y-2', i < unmatchedTopics.length - 1 ? 'pb-4 border-b border-white/8' : '')}>
-                      <p className="text-xs font-semibold text-white/80">{topic.title}</p>
+                    <div key={i} className={cn('space-y-2.5', i < unmatchedTopics.length - 1 ? 'pb-4 border-b border-white/8' : '')}>
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="text-xs font-semibold text-white/80">{topic.title}</p>
+                        <button
+                          type="button"
+                          onClick={() => setCreateOKRTopic(topic)}
+                          className="shrink-0 flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border border-[#4A268C]/50 text-[#a78bfa] bg-[#4A268C]/15 hover:bg-[#4A268C]/30 transition-colors whitespace-nowrap"
+                        >
+                          <Plus size={11} /> Create OKR
+                        </button>
+                      </div>
                       <p className="text-xs text-white/50 leading-relaxed">{topic.summary}</p>
-                      <Textarea
-                        value={editedQuestions[topic.title] ?? topic.suggestedQuestion}
-                        onChange={e => setEditedQuestions(prev => ({ ...prev, [topic.title]: e.target.value }))}
-                        rows={2}
-                        className="text-xs resize-none bg-white/5 border-white/10 text-white/80 placeholder:text-white/30 focus:border-[#a78bfa]/50"
-                      />
+                      <div className="space-y-1">
+                        <p className="text-xs text-white/30 font-medium">Question to ask the area lead:</p>
+                        <Textarea
+                          value={editedQuestions[topic.title] ?? topic.suggestedQuestion}
+                          onChange={e => setEditedQuestions(prev => ({ ...prev, [topic.title]: e.target.value }))}
+                          rows={2}
+                          className="text-xs resize-none bg-white/5 border-white/10 text-white/80 placeholder:text-white/30 focus:border-[#a78bfa]/50"
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -519,6 +542,17 @@ export default function AIUpdateModal({
           </div>
         )}
       </DialogContent>
+
+      {/* Create OKR from unmatched topic */}
+      <ObjectiveDialog
+        open={createOKRTopic !== null}
+        onClose={() => setCreateOKRTopic(null)}
+        type="area"
+        areaId={areaId}
+        companyObjectives={companyObjectives as CompanyObjective[]}
+        initialTitle={createOKRTopic?.title ?? ''}
+        onSuccess={() => { setCreateOKRTopic(null); onSuccess() }}
+      />
     </Dialog>
   )
 }

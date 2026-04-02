@@ -23,6 +23,7 @@ interface ObjectiveDialogProps {
   existing?: AreaObjective | CompanyObjective
   companyObjectives?: CompanyObjective[]
   areaId?: string
+  initialTitle?: string
   onSuccess: () => void
 }
 
@@ -33,12 +34,13 @@ export default function ObjectiveDialog({
   existing,
   companyObjectives,
   areaId,
+  initialTitle,
   onSuccess,
 }: ObjectiveDialogProps) {
   const supabase = createClient()
   const { quarter, year } = getCurrentQuarter()
 
-  const [title, setTitle] = useState(existing?.title ?? '')
+  const [title, setTitle] = useState(existing?.title ?? initialTitle ?? '')
   const [alignedTo, setAlignedTo] = useState<string | null>(
     (existing as AreaObjective)?.aligned_to ?? null
   )
@@ -46,9 +48,9 @@ export default function ObjectiveDialog({
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    setTitle(existing?.title ?? '')
+    setTitle(existing?.title ?? initialTitle ?? '')
     setAlignedTo((existing as AreaObjective)?.aligned_to ?? null)
-  }, [existing, open])
+  }, [existing, open, initialTitle])
 
   const table = type === 'area' ? 'area_objectives' : 'company_objectives'
 
