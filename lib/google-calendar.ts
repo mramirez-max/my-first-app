@@ -16,7 +16,14 @@ async function getAccessToken(): Promise<string> {
   return data.access_token
 }
 
-export async function getTodayMeetingTitles(): Promise<string[]> {
+export interface CalendarFetchResult {
+  titles: string[]
+  timeMin: string
+  timeMax: string
+  rawItems: { summary?: string; start?: { date?: string; dateTime?: string } }[]
+}
+
+export async function getTodayMeetingTitles(): Promise<CalendarFetchResult> {
   const accessToken = await getAccessToken()
 
   // Compute "today" in Bogotá (UTC-5) so the window is correct regardless
@@ -49,12 +56,16 @@ export async function getTodayMeetingTitles(): Promise<string[]> {
   const data = await res.json()
   if (!data.items) throw new Error(`Calendar API error: ${JSON.stringify(data)}`)
 
+  const rawItems = data.items as { summary?: string; start?: { date?: string; dateTime?: string } }[]
+
   // Only include timed events (start.dateTime), not all-day events (start.date only),
   // which Google Calendar can return even when they fall outside the intended day.
-  return (data.items as { summary?: string; start?: { date?: string; dateTime?: string } }[])
+  const titles = rawItems
     .filter(e => !!e.start?.dateTime)
     .map(e => e.summary ?? '')
     .filter(Boolean)
+
+  return { titles, timeMin, timeMax, rawItems }
 }
 
 export interface MatchedMeeting {
@@ -81,6 +92,7 @@ export function getMatchedMeetings(meetingTitles: string[]): MatchedMeeting[] {
   return matched
 }
 
+/** Returns unique area names across all matched meetings (used for data fetching). */
 /** Returns unique area names across all matched meetings (used for data fetching). */
 export function getAreasForMeetings(meetingTitles: string[]): string[] {
   const areas = new Set<string>()
