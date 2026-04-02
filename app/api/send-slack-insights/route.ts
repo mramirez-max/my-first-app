@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentQuarter } from '@/types'
-import { getTodayMeetingTitles, MatchedMeeting } from '@/lib/google-calendar'
-import { MEETING_AREA_MAP, GroupedMeeting } from '@/config/meeting-area-map'
+import { getTodayMeetingTitles, getMatchedMeetings, MatchedMeeting } from '@/lib/google-calendar'
+import { GroupedMeeting } from '@/config/meeting-area-map'
 
 export const maxDuration = 60
 
@@ -193,70 +193,14 @@ export async function POST(request: NextRequest) {
     let calendarError:   string | null    = null
     let calendarDebug:   { timeMin: string; timeMax: string; rawItems: { summary?: string; start?: { date?: string; dateTime?: string } }[] } | null = null
 
-    // Step 1a: Fetch calendar titles
     try {
       const result  = await getTodayMeetingTitles()
       meetingTitles = result.titles
       calendarDebug = { timeMin: result.timeMin, timeMax: result.timeMax, rawItems: result.rawItems }
+      matchedMeetings = getMatchedMeetings(meetingTitles)
+      todayAreas      = [...new Set(matchedMeetings.flatMap(m => m.config.areas))]
     } catch (err) {
       calendarError = err instanceof Error ? err.message : String(err)
-    }
-
-    // Step 1b: Use Sonnet tool_use to identify actual leadership meetings.
-    // Kept separate from calendar fetch so an AI failure doesn't suppress the brief.
-    // tool_use with enum on matched_keywords means Sonnet cannot hallucinate keywords
-    // outside the configured list, and correctly ignores incidental matches like
-    // "Vibe Coding for GTM" (not a GTM review) or "COO- Ideation time" (not a COO 1:1).
-    if (!calendarError) {
-      const keywords = Object.keys(MEETING_AREA_MAP)
-      try {
-        const identifyResponse = await anthropic.messages.create({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 200,
-          tools: [{
-            name: 'set_matched_meetings',
-            description: 'Report which configured leadership meetings are happening today',
-            input_schema: {
-              type: 'object' as const,
-              properties: {
-                matched_keywords: {
-                  type: 'array',
-                  items: { type: 'string', enum: keywords },
-                  description: 'Keywords from the list that have a real leadership meeting today',
-                },
-              },
-              required: ['matched_keywords'],
-            },
-          }],
-          tool_choice: { type: 'tool', name: 'set_matched_meetings' },
-          messages: [{
-            role: 'user',
-            content: `Identify which configured leadership review meetings are happening today.
-
-Calendar events today:
-${meetingTitles.length > 0 ? meetingTitles.map(t => `- ${t}`).join('\n') : '(no events)'}
-
-Configured meeting types: ${keywords.join(', ')}
-
-A match means the calendar event IS that specific leadership meeting — a formal 1:1 with that executive or a named cross-functional review.
-Do NOT match if the keyword appears incidentally in an unrelated event title.`,
-          }],
-        })
-
-        const toolUse = identifyResponse.content.find(b => b.type === 'tool_use')
-        const matched = toolUse && 'input' in toolUse
-          ? (toolUse.input as { matched_keywords?: string[] }).matched_keywords ?? []
-          : []
-
-        matchedMeetings = matched
-          .filter(k => keywords.includes(k))
-          .map(k => ({ keyword: k, config: MEETING_AREA_MAP[k] }))
-        todayAreas = [...new Set(matchedMeetings.flatMap(m => m.config.areas))]
-      } catch {
-        // AI identification failed — fall back to no meetings (safe: skip rather than blast all areas)
-        matchedMeetings = []
-        todayAreas      = []
-      }
     }
 
     if (calendarError) {

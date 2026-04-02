@@ -73,6 +73,37 @@ export interface MatchedMeeting {
   config: MeetingConfig
 }
 
+/**
+ * Returns true if a calendar event title is a genuine match for a meeting keyword.
+ *
+ * Valid patterns (keyword must be structurally prominent, not incidental):
+ *   "CFO"                 → keyword is the entire title
+ *   "CFO Weekly"          → keyword at start, followed by space/separator
+ *   "1:1 CFO"             → keyword after a 1:1 prefix
+ *   "Julian | CFO"        → keyword at end after an explicit separator (/ | &)
+ *   "GTM Review"          → keyword phrase at start
+ *
+ * Rejected patterns:
+ *   "COO- Ideation time"  → keyword at start but followed by hyphen (time block label)
+ *   "Vibe Coding for GTM" → keyword at end but preceded only by a plain word, not a separator
+ */
+function titleMatchesKeyword(title: string, keyword: string): boolean {
+  const kw = keyword.toLowerCase()
+  // Strip leading emoji, dashes, colons, and whitespace
+  const clean = title.replace(/^[^\p{L}\p{N}]+/u, '').trim().toLowerCase()
+  // Strip common "1:1 " or "1-1 " prefix
+  const stripped = clean.replace(/^1[:\-]1\s+/, '').trim()
+
+  // 1. Keyword equals the full (stripped) title
+  if (stripped === kw) return true
+  // 2. Keyword at the start, followed by space or explicit separator (not hyphen)
+  if (new RegExp(`^${kw}(\\s|/|\\||:|,)`).test(stripped)) return true
+  // 3. Keyword at the end, preceded by an explicit separator / | & (not a generic space/word)
+  if (new RegExp(`(/|\\||&)\\s*${kw}$`).test(clean)) return true
+
+  return false
+}
+
 /** Returns matched meeting configs for today's calendar titles. */
 export function getMatchedMeetings(meetingTitles: string[]): MatchedMeeting[] {
   const matched: MatchedMeeting[] = []
@@ -80,10 +111,7 @@ export function getMatchedMeetings(meetingTitles: string[]): MatchedMeeting[] {
 
   for (const title of meetingTitles) {
     for (const [keyword, config] of Object.entries(MEETING_AREA_MAP)) {
-      if (
-        !seenKeywords.has(keyword) &&
-        new RegExp(`\\b${keyword}\\b`, 'i').test(title)
-      ) {
+      if (!seenKeywords.has(keyword) && titleMatchesKeyword(title, keyword)) {
         matched.push({ keyword, config })
         seenKeywords.add(keyword)
       }
