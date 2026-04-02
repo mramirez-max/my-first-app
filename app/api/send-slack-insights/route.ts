@@ -200,7 +200,11 @@ export async function POST(request: NextRequest) {
       calendarError = err instanceof Error ? err.message : String(err)
     }
 
-    if (todayAreas.length === 0 && !calendarError) {
+    if (calendarError) {
+      return NextResponse.json({ ok: true, skipped: true, reason: 'Calendar unavailable', calendarError })
+    }
+
+    if (todayAreas.length === 0) {
       return NextResponse.json({ ok: true, skipped: true, reason: 'No leadership meetings today' })
     }
 
@@ -223,13 +227,10 @@ export async function POST(request: NextRequest) {
     const getAreaName = (o: ObjRow) => (o.area as { name?: string } | null)?.name ?? 'Unknown'
     const getKRs      = (o: ObjRow): KRRow[] => (o.key_results as KRRow[]) ?? []
 
-    const filteredObjectives = calendarError || todayAreas.length === 0
-      ? (areaObjectives ?? []) as unknown as ObjRow[]
-      : (areaObjectives ?? []).filter(o => todayAreas.includes(getAreaName(o as unknown as ObjRow))) as unknown as ObjRow[]
+    const filteredObjectives = (areaObjectives ?? [])
+      .filter(o => todayAreas.includes(getAreaName(o as unknown as ObjRow))) as unknown as ObjRow[]
 
-    const relevantAreas = calendarError || todayAreas.length === 0
-      ? (areas ?? [])
-      : (areas ?? []).filter(a => todayAreas.includes(a.name))
+    const relevantAreas = (areas ?? []).filter(a => todayAreas.includes(a.name))
 
     const areaIdsWithOKRs = new Set((areaObjectives ?? []).map(o => (o as unknown as ObjRow).area_id))
     const missingAreas    = relevantAreas.filter(a => !areaIdsWithOKRs.has(a.id)).map(a => a.name)
@@ -299,11 +300,7 @@ export async function POST(request: NextRequest) {
       weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/Bogota',
     })
 
-    const meetingLabel = matchedMeetings.length > 0
-      ? `_Triggered by: ${matchedMeetings.map(m => m.keyword).join(', ')}_`
-      : calendarError
-        ? `_⚠️ Calendar unavailable — showing all areas_`
-        : `_No meetings matched_`
+    const meetingLabel = `_Triggered by: ${matchedMeetings.map(m => m.keyword).join(', ')}_`
 
     if (detail) {
       const parentTs = await postToSlack(`*${dateLabel} / OKR Execution Brief* 🧵👇🏼\n${meetingLabel}\n\n${summary}`)
