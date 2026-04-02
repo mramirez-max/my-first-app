@@ -1,4 +1,4 @@
-import { MEETING_AREA_MAP } from '@/config/meeting-area-map'
+import { MEETING_AREA_MAP, MeetingConfig } from '@/config/meeting-area-map'
 
 async function getAccessToken(): Promise<string> {
   const res = await fetch('https://oauth2.googleapis.com/token', {
@@ -44,14 +44,35 @@ export async function getTodayMeetingTitles(): Promise<string[]> {
     .filter(Boolean)
 }
 
-export function getAreasForMeetings(meetingTitles: string[]): string[] {
-  const areas = new Set<string>()
+export interface MatchedMeeting {
+  keyword: string   // the matched keyword (e.g. "GTM", "CCO")
+  config: MeetingConfig
+}
+
+/** Returns matched meeting configs for today's calendar titles. */
+export function getMatchedMeetings(meetingTitles: string[]): MatchedMeeting[] {
+  const matched: MatchedMeeting[] = []
+  const seenKeywords = new Set<string>()
+
   for (const title of meetingTitles) {
-    for (const [keyword, mappedAreas] of Object.entries(MEETING_AREA_MAP)) {
-      if (title.toLowerCase().includes(keyword.toLowerCase())) {
-        mappedAreas.forEach(a => areas.add(a))
+    for (const [keyword, config] of Object.entries(MEETING_AREA_MAP)) {
+      if (
+        !seenKeywords.has(keyword) &&
+        title.toLowerCase().includes(keyword.toLowerCase())
+      ) {
+        matched.push({ keyword, config })
+        seenKeywords.add(keyword)
       }
     }
+  }
+  return matched
+}
+
+/** Returns unique area names across all matched meetings (used for data fetching). */
+export function getAreasForMeetings(meetingTitles: string[]): string[] {
+  const areas = new Set<string>()
+  for (const { config } of getMatchedMeetings(meetingTitles)) {
+    config.areas.forEach(a => areas.add(a))
   }
   return Array.from(areas)
 }

@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentQuarter } from '@/types'
-import { getTodayMeetingTitles, getAreasForMeetings } from '@/lib/google-calendar'
+import { getTodayMeetingTitles, getMatchedMeetings, getAreasForMeetings, MatchedMeeting } from '@/lib/google-calendar'
+import { GroupedMeeting } from '@/config/meeting-area-map'
 
 export const maxDuration = 60
 
@@ -25,36 +26,181 @@ async function postToSlack(message: string, threadTs?: string): Promise<string> 
   return data.ts as string
 }
 
+// --- Area OKR data text builder ---
+type AreaInsight = {
+  area: string
+  hasOKRs: boolean
+  keyResults: {
+    description: string
+    confidenceScore: number | null
+    latestUpdate: string | null
+    neverUpdated: boolean
+  }[]
+}
+
+function buildAreaDataText(areaInsights: AreaInsight[]): string {
+  return areaInsights.map(a => {
+    if (!a.hasOKRs) return `Area: ${a.area}\nStatus: No OKRs set for this quarter.`
+    const krLines = a.keyResults.map(kr => {
+      const score  = kr.confidenceScore !== null ? `Confidence: ${kr.confidenceScore}/5` : 'Confidence: not rated'
+      const update = kr.neverUpdated
+        ? 'Latest update: never updated'
+        : `Latest update: "${kr.latestUpdate ?? ''}"`
+      return `  - KR: ${kr.description}\n    ${score}\n    ${update}`
+    }).join('\n')
+    return `Area: ${a.area}\n${krLines || '  (no key results)'}`
+  }).join('\n\n')
+}
+
+// --- Prompt builders ---
+
+function buildGroupedMeetingContext(meetings: MatchedMeeting[]): string {
+  const grouped = meetings.filter(m => m.config.type === 'grouped') as { keyword: string; config: GroupedMeeting }[]
+  if (grouped.length === 0) return ''
+
+  return grouped.map(({ keyword, config }) => {
+    const questions = config.focusQuestions.map((q, i) => `  ${i + 1}. ${q}`).join('\n')
+    return `MEETING: ${keyword}
+Purpose: ${config.purpose}
+Areas involved: ${config.areas.join(', ')}
+Questions leadership should walk in ready to answer:
+${questions}`
+  }).join('\n\n')
+}
+
+function buildPrompt(
+  today: string,
+  quarter: number,
+  year: number,
+  matchedMeetings: MatchedMeeting[],
+  areaDataText: string,
+  calendarError: string | null,
+): string {
+  const hasGrouped    = matchedMeetings.some(m => m.config.type === 'grouped')
+  const hasSimple     = matchedMeetings.some(m => m.config.type === 'simple')
+  const meetingNames  = matchedMeetings.map(m => m.keyword).join(', ')
+  const groupedCtx    = buildGroupedMeetingContext(matchedMeetings)
+
+  const header = `You are a blunt AI Chief of Staff preparing Julian (CEO) and Cami (COO) for today's leadership meetings. No fluff, no filler, no consulting speak. Every word must earn its place.
+
+Today: ${today} | Q${quarter} ${year}
+Meetings today: ${meetingNames || 'All areas (calendar unavailable)'}
+${calendarError ? `(Calendar unavailable — showing all areas)\n` : ''}`
+
+  const okrData = `OKR DATA:
+${areaDataText}`
+
+  if (hasGrouped) {
+    const groupedInstructions = `
+MEETING CONTEXT:
+${groupedCtx}
+
+${hasSimple ? `There are also 1:1 meetings today (${matchedMeetings.filter(m => m.config.type === 'simple').map(m => m.keyword).join(', ')}). Cover those briefly after the grouped meetings.` : ''}`
+
+    return `${header}
+${groupedInstructions}
+
+${okrData}
+
+Output exactly TWO sections using these tokens on their own line: CHANNEL_SUMMARY: and THREAD_DETAIL:
+
+CHANNEL_SUMMARY:
+4–6 lines max. No intro, no sign-off. Start with:
+"Hey Juli & Cami 👋 | ${today}"
+
+For each grouped meeting, ONE sharp line naming the biggest risk or cross-area issue (not per-area bullet — cross-area signal).
+Format: *[Meeting name]* → [cross-area insight in <12 words] → ❓ [one question]
+
+THREAD_DETAIL:
+For each grouped meeting, a structured block:
+
+*[Meeting Name] — [Purpose in 5 words or fewer]*
+Answer each focus question with one crisp line using the OKR data:
+[✅ or ⚠️ or 🔥] [Question rephrased as finding, max 15 words. Bold any number.]
+
+Then: ❓ *The one question that most needs an answer in this meeting today.*
+
+For 1:1 meetings (if any), one compact block per area:
+*Area*
+🔥 [Risk or status in one sentence. Bold any number.]
+❓ [One question for the owner.]
+
+Blank line between all blocks.
+End with: "_→ https://ontop-okr-app.vercel.app/executive_"
+
+RULES:
+- Structure the brief around the meeting's purpose and questions — not a per-area status list
+- Flag cross-area dependencies and misalignments explicitly
+- Confidence ≤2 or never updated = 🔥. No OKRs = "flying blind"
+- Bold metrics and numbers with *asterisks*
+- No greetings, no transitions, no summaries
+- If something is healthy, say so in one word. Save detail for risks.`
+  }
+
+  // All simple / 1:1 meetings — original format
+  const simpleAreas = matchedMeetings.map(m => m.config.areas).flat().join(', ')
+  return `${header}
+Areas in review: ${simpleAreas}
+
+${okrData}
+
+Output exactly TWO sections using these tokens on their own line: CHANNEL_SUMMARY: and THREAD_DETAIL:
+
+CHANNEL_SUMMARY:
+3–5 lines max. No intro, no sign-off.
+
+"Hey Juli & Cami 👋 | ${today}"
+[ONE line: the single most important thing to know today — max 15 words]
+[2–3 bullets, one per critical area, format: *Area* → risk in <10 words → ❓ question]
+
+THREAD_DETAIL:
+One block per critical area (3–5 areas max). Each block:
+
+*Area Name*
+🔥 [Risk in one short sentence. Bold any number.]
+❓ [One question the owner must answer today.]
+
+Blank line between areas. Nothing else.
+End with: "_→ https://ontop-okr-app.vercel.app/executive_"
+
+RULES:
+- No greetings, no transitions, no summaries
+- No area gets more than 2 lines in the thread
+- Confidence ≤2 or no updates = flag it. No OKRs = say "flying blind"
+- Bold metrics with *asterisks*
+- If everything is healthy, write one line saying so. Done.`
+}
+
 export async function POST(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
   const cronSecret = process.env.CRON_SECRET
-  const isCron = cronSecret && authHeader === `Bearer ${cronSecret}`
-  const isManual = request.headers.get('x-manual-send') === '1'
+  const isCron     = cronSecret && authHeader === `Bearer ${cronSecret}`
+  const isManual   = request.headers.get('x-manual-send') === '1'
 
   if (!isCron && !isManual) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   try {
-    // Step 1: Find today's leadership meetings and map to areas
-    let todayAreas: string[] = []
-    let meetingTitles: string[] = []
-    let calendarError: string | null = null
+    // Step 1: Find today's meetings
+    let matchedMeetings: MatchedMeeting[] = []
+    let todayAreas:      string[]         = []
+    let meetingTitles:   string[]         = []
+    let calendarError:   string | null    = null
 
     try {
-      meetingTitles = await getTodayMeetingTitles()
-      todayAreas = getAreasForMeetings(meetingTitles)
+      meetingTitles   = await getTodayMeetingTitles()
+      matchedMeetings = getMatchedMeetings(meetingTitles)
+      todayAreas      = getAreasForMeetings(meetingTitles)
     } catch (err) {
       calendarError = err instanceof Error ? err.message : String(err)
     }
 
-    const noMeetingsToday = todayAreas.length === 0 && !calendarError
-
-    if (noMeetingsToday) {
+    if (todayAreas.length === 0 && !calendarError) {
       return NextResponse.json({ ok: true, skipped: true, reason: 'No leadership meetings today' })
     }
 
-    // Step 2: Fetch OKR data
+    // Step 2: Fetch OKR data for relevant areas
     const supabase = createAdminClient()
     const { quarter, year } = getCurrentQuarter()
 
@@ -70,128 +216,66 @@ export async function POST(request: NextRequest) {
     type KRRow = { description: string; updates: { confidence_score: number; update_text: string; created_at: string }[] }
     type ObjRow = { area_id: string; area: unknown; key_results: unknown }
 
-    function getAreaName(obj: ObjRow) {
-      return (obj.area as { name?: string } | null)?.name ?? 'Unknown'
-    }
-    function getKRs(obj: ObjRow): KRRow[] {
-      return (obj.key_results as KRRow[]) ?? []
-    }
+    const getAreaName = (o: ObjRow) => (o.area as { name?: string } | null)?.name ?? 'Unknown'
+    const getKRs      = (o: ObjRow): KRRow[] => (o.key_results as KRRow[]) ?? []
 
-    // Filter to today's areas (or all if calendar failed)
     const filteredObjectives = calendarError || todayAreas.length === 0
       ? (areaObjectives ?? []) as unknown as ObjRow[]
-      : (areaObjectives ?? []).filter(o =>
-          todayAreas.includes(getAreaName(o as unknown as ObjRow))
-        ) as unknown as ObjRow[]
+      : (areaObjectives ?? []).filter(o => todayAreas.includes(getAreaName(o as unknown as ObjRow))) as unknown as ObjRow[]
 
     const relevantAreas = calendarError || todayAreas.length === 0
       ? (areas ?? [])
       : (areas ?? []).filter(a => todayAreas.includes(a.name))
 
     const areaIdsWithOKRs = new Set((areaObjectives ?? []).map(o => (o as unknown as ObjRow).area_id))
-    const missingAreas: string[] = relevantAreas
-      .filter(a => !areaIdsWithOKRs.has(a.id))
-      .map(a => a.name)
+    const missingAreas    = relevantAreas.filter(a => !areaIdsWithOKRs.has(a.id)).map(a => a.name)
 
-    // Step 3: Build rich per-area data for AI summarization
-    type AreaInsight = {
-      area: string
-      hasOKRs: boolean
-      keyResults: {
-        description: string
-        confidenceScore: number | null
-        latestUpdate: string | null
-        neverUpdated: boolean
-      }[]
-    }
-
+    // Step 3: Build area insights
     const areaInsights: AreaInsight[] = filteredObjectives.map(obj => {
       const areaName = getAreaName(obj)
-      const krs = getKRs(obj)
       return {
         area: areaName,
         hasOKRs: true,
-        keyResults: krs.map(kr => {
+        keyResults: getKRs(obj).map(kr => {
           const sorted = (kr.updates ?? []).sort(
             (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
           )
           const latest = sorted[0] ?? null
           return {
-            description: kr.description,
+            description:     kr.description,
             confidenceScore: latest?.confidence_score ?? null,
-            latestUpdate: latest?.update_text ?? null,
-            neverUpdated: !latest,
+            latestUpdate:    latest?.update_text ?? null,
+            neverUpdated:    !latest,
           }
         }),
       }
     })
 
-    // Add areas that have no OKRs at all
     for (const name of missingAreas) {
       if (!areaInsights.find(a => a.area === name)) {
         areaInsights.push({ area: name, hasOKRs: false, keyResults: [] })
       }
     }
 
-    // Step 4: AI summarization pass
+    // Step 4: Build meeting-aware prompt and call Claude
     const today = new Date().toLocaleDateString('en-US', {
       weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/Bogota',
     })
-    const reviewLabel = todayAreas.length > 0 ? todayAreas.join(', ') : 'All Areas'
 
-    const areaDataText = areaInsights.map(a => {
-      if (!a.hasOKRs) {
-        return `Area: ${a.area}\nStatus: No OKRs set for this quarter.\n`
-      }
-      const krLines = a.keyResults.map(kr => {
-        const score = kr.confidenceScore !== null ? `Confidence: ${kr.confidenceScore}/5` : 'Confidence: not rated'
-        const update = kr.neverUpdated
-          ? 'Latest update: never updated'
-          : `Latest update: "${kr.latestUpdate ?? ''}"`
-        return `  - KR: ${kr.description}\n    ${score}\n    ${update}`
-      }).join('\n')
-      return `Area: ${a.area}\n${krLines || '  (no key results)'}`
-    }).join('\n\n')
-
-    const prompt = `You are a blunt AI Chief of Staff. No fluff, no filler, no consulting speak. Every word must earn its place.
-
-Today: ${today} | Q${quarter} ${year} | Areas in review: ${reviewLabel}
-${calendarError ? `(Calendar unavailable — showing all areas)\n` : ''}
-
-OKR DATA:
-${areaDataText}
-
-Output exactly TWO sections using these tokens on their own line: CHANNEL_SUMMARY: and THREAD_DETAIL:
-
-CHANNEL_SUMMARY:
-3–5 lines max. No intro, no sign-off.
-
-"Hey Juli & Cami 👋 | ${today}"
-[ONE line: the single most important thing to know today — max 15 words]
-[2–3 bullets, one per critical area, format: *Area* → risk in <10 words → ❓ question]
-
-THREAD_DETAIL:
-One block per critical area (3–5 areas max). Each block:
-
-*Area Name*
-🔥 [Risk in one short sentence. Bold the number.]
-❓ [One question the owner must answer today.]
-
-Blank line between areas. Nothing else.
-End with: "_→ https://ontop-okr-app.vercel.app/executive_"
-
-RULES:
-- No greetings, no "here's your briefing", no transitions, no summaries
-- No area gets more than 2 lines in the thread
-- Confidence ≤2 or no updates = flag it. No OKRs = say "flying blind"
-- Bold metrics with *asterisks*
-- If everything is healthy, write one line saying so. Done.`
+    const prompt = buildPrompt(
+      today,
+      quarter,
+      year,
+      matchedMeetings,
+      buildAreaDataText(areaInsights),
+      calendarError,
+    )
 
     const anthropic = new Anthropic({ maxRetries: 5 })
     const aiResponse = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
+      model:      'claude-sonnet-4-6',
       max_tokens: 2048,
-      messages: [{ role: 'user', content: prompt }],
+      messages:   [{ role: 'user', content: prompt }],
     })
 
     const raw = aiResponse.content[0].type === 'text'
@@ -201,31 +285,28 @@ RULES:
     // Parse CHANNEL_SUMMARY / THREAD_DETAIL split
     const [summaryPart, detailPart] = raw.split(/^THREAD_DETAIL:\s*/m)
     const summaryRaw = summaryPart.replace(/^CHANNEL_SUMMARY:\s*/m, '').trim()
-    // Ensure a blank line between every non-empty line in the summary
-    const summary = summaryRaw
+    const summary    = summaryRaw
       .split('\n')
       .map(l => l.trim())
       .filter(l => l.length > 0)
       .join('\n\n')
-    const detail  = detailPart?.replace(/---+\n?/g, '').trim()
+    const detail = detailPart?.replace(/---+\n?/g, '').trim()
 
     const dateLabel = new Date().toLocaleDateString('en-US', {
       weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/Bogota',
     })
 
     if (detail) {
-      // Post short summary to channel, full detail in thread
       const parentTs = await postToSlack(`*${dateLabel} / OKR Execution Brief* 🧵👇🏼\n\n${summary}`)
       await postToSlack(detail, parentTs)
     } else {
-      // Fallback: post full message once (no split found)
       await postToSlack(summary || raw)
     }
 
     return NextResponse.json({
       ok: true,
-      areas: reviewLabel,
       meetings: meetingTitles,
+      matchedMeetings: matchedMeetings.map(m => m.keyword),
       areasAnalyzed: areaInsights.length,
     })
   } catch (err) {
