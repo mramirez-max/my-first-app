@@ -243,7 +243,7 @@ async function buildOKRContext(): Promise<string> {
   // Calendar context
   let calendarLine = ''
   try {
-    const { titles } = await getTodayMeetingTitles()
+    const titles     = await getTodayMeetingTitles()
     const todayAreas = getAreasForMeetings(titles)
     if (todayAreas.length > 0) calendarLine = `\nToday's scheduled reviews: ${todayAreas.join(', ')}`
   } catch { /* calendar optional */ }

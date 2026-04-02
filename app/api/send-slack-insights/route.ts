@@ -191,12 +191,9 @@ export async function POST(request: NextRequest) {
     let todayAreas:      string[]         = []
     let meetingTitles:   string[]         = []
     let calendarError:   string | null    = null
-    let calendarDebug:   { timeMin: string; timeMax: string; rawItems: { summary?: string; start?: { date?: string; dateTime?: string } }[] } | null = null
 
     try {
-      const result  = await getTodayMeetingTitles()
-      meetingTitles = result.titles
-      calendarDebug = { timeMin: result.timeMin, timeMax: result.timeMax, rawItems: result.rawItems }
+      meetingTitles = await getTodayMeetingTitles()
       matchedMeetings = getMatchedMeetings(meetingTitles)
       todayAreas      = [...new Set(matchedMeetings.flatMap(m => m.config.areas))]
     } catch (err) {
@@ -308,18 +305,6 @@ export async function POST(request: NextRequest) {
     if (detail) {
       const parentTs = await postToSlack(`*${dateLabel} / OKR Execution Brief* 🧵👇🏼\n${meetingLabel}\n\n${summary}`)
       await postToSlack(detail, parentTs)
-      // Debug: show calendar window + all raw event titles with their start times
-      if (calendarDebug) {
-        const allTitles = calendarDebug.rawItems
-          .map(e => `• ${e.start?.dateTime ?? e.start?.date ?? 'no-date'} — ${e.summary ?? '(no title)'}`)
-          .join('\n') || '(no events returned)'
-        await postToSlack(
-          `_🔍 Debug — window: ${calendarDebug.timeMin} → ${calendarDebug.timeMax}_\n` +
-          `_Matched keywords: ${matchedMeetings.map(m => m.keyword).join(', ') || 'none'}_\n\n` +
-          `*All calendar events returned:*\n${allTitles}`,
-          parentTs,
-        )
-      }
     } else {
       await postToSlack(`${meetingLabel}\n\n${summary || raw}`)
     }
