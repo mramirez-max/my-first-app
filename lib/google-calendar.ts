@@ -49,7 +49,10 @@ export async function getTodayMeetingTitles(): Promise<string[]> {
   const data = await res.json()
   if (!data.items) throw new Error(`Calendar API error: ${JSON.stringify(data)}`)
 
-  return (data.items as { summary?: string }[])
+  // Only include timed events (start.dateTime), not all-day events (start.date only),
+  // which Google Calendar can return even when they fall outside the intended day.
+  return (data.items as { summary?: string; start?: { date?: string; dateTime?: string } }[])
+    .filter(e => !!e.start?.dateTime)
     .map(e => e.summary ?? '')
     .filter(Boolean)
 }
