@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentQuarter } from '@/types'
-import { getTodayMeetingTitles, getMatchedMeetings, getAreasForMeetings, MatchedMeeting } from '@/lib/google-calendar'
-import { GroupedMeeting } from '@/config/meeting-area-map'
+import { getTodayMeetingTitles, MatchedMeeting } from '@/lib/google-calendar'
+import { MEETING_AREA_MAP, GroupedMeeting } from '@/config/meeting-area-map'
 
 export const maxDuration = 60
 
@@ -24,6 +24,38 @@ async function postToSlack(message: string, threadTs?: string): Promise<string> 
   const data = await res.json()
   if (!data.ok) throw new Error(`Slack error: ${data.error}`)
   return data.ts as string
+}
+
+// --- AI-powered meeting identification ---
+async function identifyMeetings(anthropic: Anthropic, calendarTitles: string[]): Promise<MatchedMeeting[]> {
+  if (calendarTitles.length === 0) return []
+
+  const keywords = Object.keys(MEETING_AREA_MAP)
+  const response = await anthropic.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 200,
+    messages: [{
+      role: 'user',
+      content: `Identify which leadership meeting types are happening today based on these calendar event titles.
+
+Calendar events:
+${calendarTitles.map(t => `- ${t}`).join('\n')}
+
+Available meeting types: ${keywords.join(', ')}
+
+Return ONLY a JSON array of matching keywords. A match means the calendar event is clearly that specific meeting (e.g. "1:1 CFO" → "CFO", "GTM Review" → "GTM"). Do not match partial or coincidental occurrences — "coordination" does not match "COO". If nothing matches, return [].`,
+    }],
+  })
+
+  const text = response.content[0].type === 'text' ? response.content[0].text.trim() : '[]'
+  try {
+    const arr = JSON.parse(text.match(/\[[\s\S]*\]/)?.[0] ?? '[]') as string[]
+    return arr
+      .filter(k => keywords.includes(k))
+      .map(k => ({ keyword: k, config: MEETING_AREA_MAP[k] }))
+  } catch {
+    return []
+  }
 }
 
 // --- Area OKR data text builder ---
@@ -183,8 +215,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const anthropic = new Anthropic({ maxRetries: 5 })
+
   try {
-    // Step 1: Find today's meetings
+    // Step 1: Fetch calendar titles then use AI to identify matching meetings
     let matchedMeetings: MatchedMeeting[] = []
     let todayAreas:      string[]         = []
     let meetingTitles:   string[]         = []
@@ -192,8 +226,8 @@ export async function POST(request: NextRequest) {
 
     try {
       meetingTitles   = await getTodayMeetingTitles()
-      matchedMeetings = getMatchedMeetings(meetingTitles)
-      todayAreas      = getAreasForMeetings(meetingTitles)
+      matchedMeetings = await identifyMeetings(anthropic, meetingTitles)
+      todayAreas      = [...new Set(matchedMeetings.flatMap(m => m.config.areas))]
     } catch (err) {
       calendarError = err instanceof Error ? err.message : String(err)
     }
@@ -273,7 +307,6 @@ export async function POST(request: NextRequest) {
       calendarError,
     )
 
-    const anthropic = new Anthropic({ maxRetries: 5 })
     const aiResponse = await anthropic.messages.create({
       model:      'claude-sonnet-4-6',
       max_tokens: 2048,
