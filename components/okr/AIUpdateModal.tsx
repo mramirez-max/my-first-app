@@ -190,7 +190,7 @@ export default function AIUpdateModal({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl w-full max-h-[90vh] overflow-y-auto overflow-x-hidden bg-[#1c1540] border-white/10">
+      <DialogContent className="max-w-3xl w-full max-h-[90vh] overflow-y-auto overflow-x-hidden bg-[#1c1540] border-white/10">
         <DialogHeader>
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-[#FF5A70]/15 flex items-center justify-center">
@@ -340,10 +340,11 @@ export default function AIUpdateModal({
 
                 return (
                   <div key={update.keyResultId} className={cn(
-                    'border rounded-xl p-4 space-y-3 bg-gradient-to-br from-[#1c1540] to-[#23174B] transition-opacity',
-                    matchConf === 'low'  ? 'border-l-4 border-l-amber-400/60 border-white/8' : 'border-white/8',
-                    matchConf === 'none' ? 'border-l-4 border-l-white/20 border-white/8' : '',
-                    isExcluded           ? 'opacity-40' : '',
+                    'border rounded-xl p-4 space-y-3 transition-all',
+                    matchConf === 'high' && !isExcluded  ? 'border-white/8 bg-gradient-to-br from-[#1c1540] to-[#23174B]' : '',
+                    matchConf === 'low'  && !isExcluded  ? 'border-l-4 border-l-amber-400/60 border-white/8 bg-gradient-to-br from-[#1c1540] to-[#23174B]' : '',
+                    matchConf === 'none' && !isExcluded  ? 'border-l-4 border-l-white/20 border-white/8 bg-[#13102a]' : '',
+                    isExcluded                           ? 'border-white/5 bg-white/2 opacity-50' : '',
                   )}>
                     {/* KR header */}
                     <div className="flex items-start justify-between gap-3">
@@ -351,13 +352,13 @@ export default function AIUpdateModal({
                         <p className="text-xs text-white/40 mb-0.5">{kr.objective_title}</p>
                         <p className="text-sm font-semibold text-white">{kr.description}</p>
                         {matchConf === 'low' && (
-                          <span className="inline-block mt-1 text-xs px-2 py-0.5 rounded-full bg-amber-400/10 text-amber-400 border border-amber-400/25">
+                          <span className="inline-flex mt-1 text-xs px-2 py-0.5 rounded-full bg-amber-400/10 text-amber-400 border border-amber-400/25 whitespace-nowrap w-fit">
                             Weak match — limited signal in report
                           </span>
                         )}
                         {matchConf === 'none' && (
-                          <span className="inline-block mt-1 text-xs px-2 py-0.5 rounded-full bg-white/5 text-white/40 border border-white/15">
-                            Not reported — no data in this PDF
+                          <span className="inline-flex mt-1 text-xs px-2 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/25 whitespace-nowrap w-fit">
+                            Not reported in this PDF
                           </span>
                         )}
                       </div>
