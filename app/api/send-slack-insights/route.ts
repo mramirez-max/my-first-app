@@ -132,7 +132,8 @@ RULES:
 - Structure the brief around the meeting's purpose and questions — not a per-area status list
 - Flag cross-area dependencies and misalignments explicitly
 - Confidence ≤2 or never updated = 🔥. No OKRs = "flying blind"
-- Bold metrics and numbers with *asterisks*
+- Slack bold = single asterisks: *text* — do NOT use double asterisks **text**
+- Bold metrics and numbers using single asterisks: *42%*, *$1.2M*
 - No greetings, no transitions, no summaries
 - If something is healthy, say so in one word. Save detail for risks.
 - CRITICAL: only reference topics, initiatives, and risks that appear explicitly in the OKR data above. Do not add context from your own knowledge of the company or industry.`
@@ -168,7 +169,7 @@ RULES:
 - No greetings, no transitions, no summaries
 - No area gets more than 2 lines in the thread
 - Confidence ≤2 or no updates = flag it. No OKRs = say "flying blind"
-- Bold metrics with *asterisks*
+- Slack bold = single asterisks: *text* — do NOT use **text**
 - If everything is healthy, write one line saying so. Done.`
 }
 
@@ -306,6 +307,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       ok: true,
+      calendarError,
       meetings: meetingTitles,
       matchedMeetings: matchedMeetings.map(m => m.keyword),
       areasAnalyzed: areaInsights.length,

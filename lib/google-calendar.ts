@@ -68,7 +68,7 @@ export function getMatchedMeetings(meetingTitles: string[]): MatchedMeeting[] {
     for (const [keyword, config] of Object.entries(MEETING_AREA_MAP)) {
       if (
         !seenKeywords.has(keyword) &&
-        title.toLowerCase().includes(keyword.toLowerCase())
+        new RegExp(`\\b${keyword}\\b`, 'i').test(title)
       ) {
         matched.push({ keyword, config })
         seenKeywords.add(keyword)
