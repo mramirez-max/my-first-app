@@ -15,8 +15,8 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { AreaObjective, calcProgress } from '@/types'
 import { createClient } from '@/lib/supabase/client'
-import { KRInput, KRUpdate } from '@/app/api/ai-update/route'
-import { Upload, FileText, Sparkles, Check, AlertCircle, Loader2 } from 'lucide-react'
+import { KRInput, KRUpdate, UnmatchedTopic } from '@/app/api/ai-update/route'
+import { Upload, FileText, Sparkles, Check, AlertCircle, Loader2, MessageSquare, Eye, EyeOff } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface AIUpdateModalProps {
@@ -52,6 +52,9 @@ export default function AIUpdateModal({
   const [dragOver, setDragOver] = useState(false)
   const [updates, setUpdates] = useState<KRUpdate[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [unmatchedTopics, setUnmatchedTopics] = useState<UnmatchedTopic[]>([])
+  const [excluded, setExcluded] = useState<Set<string>>(new Set())
+  const [editedQuestions, setEditedQuestions] = useState<Record<string, string>>({})
 
   // Flatten all KRs from all objectives
   const allKRs: KRInput[] = objectives.flatMap(obj =>
@@ -104,7 +107,7 @@ export default function AIUpdateModal({
 
       const res = await fetch('/api/ai-update', { method: 'POST', body: formData })
 
-      let data: { updates?: KRUpdate[]; error?: string }
+      let data: { updates?: KRUpdate[]; unmatchedTopics?: UnmatchedTopic[]; error?: string }
       try {
         data = await res.json()
       } catch {
@@ -115,7 +118,13 @@ export default function AIUpdateModal({
         throw new Error(data.error ?? 'Failed to generate updates')
       }
 
-      setUpdates(data.updates ?? [])
+      const fetchedUpdates = data.updates ?? []
+      const fetchedTopics  = data.unmatchedTopics ?? []
+
+      setUpdates(fetchedUpdates)
+      setUnmatchedTopics(fetchedTopics)
+      setExcluded(new Set(fetchedUpdates.filter(u => (u.matchConfidence ?? 'low') === 'none').map(u => u.keyResultId)))
+      setEditedQuestions(Object.fromEntries(fetchedTopics.map(t => [t.title, t.suggestedQuestion])))
       setStep('preview')
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Something went wrong'
@@ -136,7 +145,7 @@ export default function AIUpdateModal({
     const week_date = weekDate.toISOString().split('T')[0]
 
     try {
-      for (const update of updates) {
+      for (const update of updates.filter(u => !excluded.has(u.keyResultId))) {
         // Insert weekly update
         await supabase.from('area_kr_updates').insert({
           key_result_id: update.keyResultId,
@@ -167,6 +176,9 @@ export default function AIUpdateModal({
     setPdfFile(null)
     setUpdates([])
     setError(null)
+    setUnmatchedTopics([])
+    setExcluded(new Set())
+    setEditedQuestions({})
     onClose()
   }
 
@@ -313,15 +325,56 @@ export default function AIUpdateModal({
               {updates.map(update => {
                 const kr = krMap[update.keyResultId]
                 if (!kr) return null
-                const progress = calcProgress(update.currentValue, kr.target_value)
-                const conf = CONFIDENCE_LABELS[update.confidenceScore]
+                const progress    = calcProgress(update.currentValue, kr.target_value)
+                const conf        = CONFIDENCE_LABELS[update.confidenceScore]
+                const matchConf   = update.matchConfidence ?? 'low'
+                const isExcluded  = excluded.has(update.keyResultId)
+
+                function toggleExclude() {
+                  setExcluded(prev => {
+                    const next = new Set(prev)
+                    isExcluded ? next.delete(update.keyResultId) : next.add(update.keyResultId)
+                    return next
+                  })
+                }
 
                 return (
-                  <div key={update.keyResultId} className="border border-white/8 rounded-xl p-4 space-y-3 bg-gradient-to-br from-[#1c1540] to-[#23174B]">
+                  <div key={update.keyResultId} className={cn(
+                    'border rounded-xl p-4 space-y-3 bg-gradient-to-br from-[#1c1540] to-[#23174B] transition-opacity',
+                    matchConf === 'low'  ? 'border-l-4 border-l-amber-400/60 border-white/8' : 'border-white/8',
+                    matchConf === 'none' ? 'border-l-4 border-l-white/20 border-white/8' : '',
+                    isExcluded           ? 'opacity-40' : '',
+                  )}>
                     {/* KR header */}
-                    <div>
-                      <p className="text-xs text-white/40 mb-0.5">{kr.objective_title}</p>
-                      <p className="text-sm font-semibold text-white">{kr.description}</p>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xs text-white/40 mb-0.5">{kr.objective_title}</p>
+                        <p className="text-sm font-semibold text-white">{kr.description}</p>
+                        {matchConf === 'low' && (
+                          <span className="inline-block mt-1 text-xs px-2 py-0.5 rounded-full bg-amber-400/10 text-amber-400 border border-amber-400/25">
+                            Weak match — limited signal in report
+                          </span>
+                        )}
+                        {matchConf === 'none' && (
+                          <span className="inline-block mt-1 text-xs px-2 py-0.5 rounded-full bg-white/5 text-white/40 border border-white/15">
+                            Not reported — no data in this PDF
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={toggleExclude}
+                        title={isExcluded ? 'Include in save' : 'Exclude from save'}
+                        className={cn(
+                          'shrink-0 flex items-center gap-1 text-xs px-2 py-1 rounded-lg border transition-colors',
+                          isExcluded
+                            ? 'border-white/15 text-white/30 hover:text-white/60 hover:border-white/25'
+                            : 'border-white/15 text-white/50 hover:text-white/80 hover:border-white/25',
+                        )}
+                      >
+                        {isExcluded ? <EyeOff size={11} /> : <Eye size={11} />}
+                        {isExcluded ? 'Excluded' : 'Include'}
+                      </button>
                     </div>
 
                     {/* Progress */}
@@ -394,28 +447,67 @@ export default function AIUpdateModal({
               })}
             </div>
 
+            {/* Unmatched topics + suggested questions */}
+            {unmatchedTopics.length > 0 && (
+              <div className="rounded-xl border border-[#4A268C]/40 bg-[#4A268C]/10 p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <MessageSquare size={14} className="text-[#a78bfa] shrink-0" />
+                  <p className="text-sm font-semibold text-[#a78bfa]">
+                    Topics reported but not in stored OKRs
+                  </p>
+                </div>
+                <p className="text-xs text-white/40">
+                  These topics appeared in the report but don't match any stored key result.
+                  Suggested questions for your next sync with the area lead — edit before using.
+                </p>
+                <div className="space-y-3">
+                  {unmatchedTopics.map((topic, i) => (
+                    <div key={i} className="space-y-1.5">
+                      <p className="text-xs font-semibold text-white/80">{topic.title}</p>
+                      <p className="text-xs text-white/50 leading-relaxed">{topic.summary}</p>
+                      <Textarea
+                        value={editedQuestions[topic.title] ?? topic.suggestedQuestion}
+                        onChange={e => setEditedQuestions(prev => ({ ...prev, [topic.title]: e.target.value }))}
+                        rows={2}
+                        className="text-xs resize-none bg-white/5 border-white/10 text-white/80 placeholder:text-white/30 focus:border-[#a78bfa]/50"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {error && (
               <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 p-2 rounded flex items-center gap-1.5">
                 <AlertCircle size={14} /> {error}
               </p>
             )}
 
-            <div className="flex gap-2 pt-1">
-              <Button
-                variant="outline"
-                onClick={() => setStep('upload')}
-                className="flex-1 border-white/15 text-white/80 hover:bg-white/5 hover:text-white"
-              >
-                Start over
-              </Button>
-              <Button
-                onClick={handleSave}
-                className="flex-1 gap-2 bg-[#FF5A70] hover:bg-[#ff3f58] text-white"
-              >
-                <Check size={14} />
-                Save {updates.length} Update{updates.length !== 1 ? 's' : ''}
-              </Button>
-            </div>
+            {(() => {
+              const saveCount = updates.filter(u => !excluded.has(u.keyResultId)).length
+              return (
+                <div className="flex gap-2 pt-1">
+                  <Button
+                    variant="outline"
+                    onClick={() => setStep('upload')}
+                    className="flex-1 border-white/15 text-white/80 hover:bg-white/5 hover:text-white"
+                  >
+                    Start over
+                  </Button>
+                  <Button
+                    onClick={handleSave}
+                    disabled={saveCount === 0}
+                    className="flex-1 gap-2 bg-[#FF5A70] hover:bg-[#ff3f58] text-white disabled:opacity-40"
+                  >
+                    <Check size={14} />
+                    Save {saveCount} Update{saveCount !== 1 ? 's' : ''}
+                    {excluded.size > 0 && (
+                      <span className="text-white/60 text-xs">({excluded.size} excluded)</span>
+                    )}
+                  </Button>
+                </div>
+              )
+            })()}
           </div>
         )}
 

@@ -19,6 +19,13 @@ export interface KRUpdate {
   confidenceScore: number
   currentValue: number
   reasoning: string
+  matchConfidence: 'high' | 'low' | 'none'
+}
+
+export interface UnmatchedTopic {
+  title: string
+  summary: string
+  suggestedQuestion: string
 }
 
 export async function POST(request: NextRequest) {
@@ -94,6 +101,12 @@ export async function POST(request: NextRequest) {
                       type: 'string',
                       description: '1–2 sentences explaining the confidence score',
                     },
+                    matchConfidence: {
+                      type: 'string',
+                      enum: ['high', 'low', 'none'],
+                      description:
+                        'How well the document covers this KR: "high" = document directly addresses it with specific data, "low" = tangential mention or weak signal, "none" = topic entirely absent from the document',
+                    },
                   },
                   required: [
                     'keyResultId',
@@ -101,11 +114,34 @@ export async function POST(request: NextRequest) {
                     'confidenceScore',
                     'currentValue',
                     'reasoning',
+                    'matchConfidence',
                   ],
                 },
               },
+              unmatchedTopics: {
+                type: 'array',
+                description: 'Topics the document covers that do not correspond to any stored KR',
+                items: {
+                  type: 'object',
+                  properties: {
+                    title: {
+                      type: 'string',
+                      description: 'Short name of the topic (e.g. "SMB pipeline velocity")',
+                    },
+                    summary: {
+                      type: 'string',
+                      description: '1–2 sentences describing what the document says about this topic',
+                    },
+                    suggestedQuestion: {
+                      type: 'string',
+                      description: 'A specific question leadership (CEO/COO) should ask the area lead about this topic — e.g. whether it should become a formal KR, what the target would be, or whether it replaces an existing KR',
+                    },
+                  },
+                  required: ['title', 'summary', 'suggestedQuestion'],
+                },
+              },
             },
-            required: ['updates'],
+            required: ['updates', 'unmatchedTopics'],
           },
         },
       ],
@@ -125,15 +161,24 @@ export async function POST(request: NextRequest) {
               type: 'text',
               text: `You are an OKR coach. Analyze the document above and generate weekly progress updates for the **${areaName}** team's key results.
 
-Here are the key results to update:
+Here are the stored key results to update:
 
 ${krsText}
 
-For each KR:
-- Write a 2–4 sentence update describing what the document reveals about progress this week
-- Assign a confidence score (1–5) based on the pace toward the target
-- Estimate the current value based on evidence in the document
-- If the document has no direct information about a KR, use the overall context and clearly note the uncertainty in the update text
+**Step 1 — Update each stored KR:**
+For each KR, generate an update and rate your match confidence:
+- "high": the document directly addresses this KR with specific data or a clear status
+- "low": the document tangentially mentions the topic or you're inferring from related context
+- "none": this KR topic is entirely absent from the document — the team did not report on it
+
+For "none" KRs: still generate an update, but be explicit that the document contained no information on this KR. Keep the current_value unchanged from the provided value. Set confidence to the existing trend if known, otherwise 2.
+
+**Step 2 — Identify unmatched topics:**
+After processing all stored KRs, scan the document for significant initiatives, metrics, or results that the team reported on but that do NOT correspond to any stored KR. For each unmatched topic:
+- Write a 1–2 sentence summary of what was reported
+- Write a specific, direct question that the CEO or COO should ask the area lead — e.g. whether this should become a formal KR, what the target would be, whether it replaces an existing KR, or why it wasn't originally included
+
+If the document perfectly matches all stored KRs with no extra topics, return an empty array for unmatchedTopics.
 
 Generate one update per KR. Use the exact KR IDs provided.`,
             },
@@ -148,9 +193,9 @@ Generate one update per KR. Use the exact KR IDs provided.`,
       return NextResponse.json({ error: 'AI did not return structured updates' }, { status: 500 })
     }
 
-    const result = toolUseBlock.input as { updates: KRUpdate[] }
+    const result = toolUseBlock.input as { updates: KRUpdate[]; unmatchedTopics: UnmatchedTopic[] }
 
-    return NextResponse.json({ updates: result.updates })
+    return NextResponse.json({ updates: result.updates, unmatchedTopics: result.unmatchedTopics ?? [] })
   } catch (error) {
     console.error('AI update error:', error)
     return NextResponse.json({ error: formatAnthropicError(error) }, { status: 500 })
