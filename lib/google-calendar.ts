@@ -19,10 +19,20 @@ async function getAccessToken(): Promise<string> {
 export async function getTodayMeetingTitles(): Promise<string[]> {
   const accessToken = await getAccessToken()
 
-  // Use America/Bogota timezone (Cami's calendar timezone)
-  const now = new Date()
-  const timeMin = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0).toISOString()
-  const timeMax = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString()
+  // Compute "today" in Bogotá (UTC-5) so the window is correct regardless
+  // of what time the serverless function runs (UTC).
+  // Bogotá midnight = 05:00 UTC; Bogotá 23:59 = next day 04:59 UTC.
+  const BOGOTA_OFFSET_MS = -5 * 60 * 60 * 1000
+  const nowUtc     = Date.now()
+  const bogotaMs   = nowUtc + BOGOTA_OFFSET_MS
+  const bogotaDate = new Date(bogotaMs)
+  const y = bogotaDate.getUTCFullYear()
+  const m = bogotaDate.getUTCMonth()
+  const d = bogotaDate.getUTCDate()
+  // Start = midnight Bogotá = 05:00 UTC same day
+  const timeMin = new Date(Date.UTC(y, m, d, 5, 0, 0)).toISOString()
+  // End = 23:59:59 Bogotá = 04:59:59 UTC next day
+  const timeMax = new Date(Date.UTC(y, m, d + 1, 4, 59, 59)).toISOString()
 
   const params = new URLSearchParams({
     timeMin,

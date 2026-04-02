@@ -134,7 +134,8 @@ RULES:
 - Confidence ≤2 or never updated = 🔥. No OKRs = "flying blind"
 - Bold metrics and numbers with *asterisks*
 - No greetings, no transitions, no summaries
-- If something is healthy, say so in one word. Save detail for risks.`
+- If something is healthy, say so in one word. Save detail for risks.
+- CRITICAL: only reference topics, initiatives, and risks that appear explicitly in the OKR data above. Do not add context from your own knowledge of the company or industry.`
   }
 
   // All simple / 1:1 meetings — original format
