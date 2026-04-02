@@ -36,14 +36,19 @@ async function identifyMeetings(anthropic: Anthropic, calendarTitles: string[]):
     max_tokens: 200,
     messages: [{
       role: 'user',
-      content: `Identify which leadership meeting types are happening today based on these calendar event titles.
+      content: `You are matching calendar event titles to a fixed list of meeting types.
 
-Calendar events:
+Calendar events today (these are the ONLY events — do not assume any others):
 ${calendarTitles.map(t => `- ${t}`).join('\n')}
 
-Available meeting types: ${keywords.join(', ')}
+Meeting types to match against: ${keywords.join(', ')}
 
-Return ONLY a JSON array of matching keywords. A match means the calendar event is clearly that specific meeting (e.g. "1:1 CFO" → "CFO", "GTM Review" → "GTM"). Do not match partial or coincidental occurrences — "coordination" does not match "COO". If nothing matches, return [].`,
+Rules:
+- Only return a keyword if one of the calendar titles above is clearly and unambiguously that meeting.
+- Do NOT infer, guess, or use outside knowledge. Only what appears in the list above counts.
+- "COO" only matches if a title contains "COO" as a standalone label for that role's meeting — not as part of another word.
+- If you are not certain a title maps to a keyword, leave it out.
+- Return ONLY a JSON array, e.g. ["CFO"] or []. No explanation.`,
     }],
   })
 
@@ -218,18 +223,29 @@ export async function POST(request: NextRequest) {
   const anthropic = new Anthropic({ maxRetries: 5 })
 
   try {
-    // Step 1: Fetch calendar titles then use AI to identify matching meetings
+    // Step 1: Fetch calendar titles
     let matchedMeetings: MatchedMeeting[] = []
     let todayAreas:      string[]         = []
     let meetingTitles:   string[]         = []
     let calendarError:   string | null    = null
 
     try {
-      meetingTitles   = await getTodayMeetingTitles()
-      matchedMeetings = await identifyMeetings(anthropic, meetingTitles)
-      todayAreas      = [...new Set(matchedMeetings.flatMap(m => m.config.areas))]
+      meetingTitles = await getTodayMeetingTitles()
     } catch (err) {
       calendarError = err instanceof Error ? err.message : String(err)
+    }
+
+    // Step 1b: AI identifies which configured meetings are happening today
+    // (kept separate so a Haiku failure doesn't trigger the all-areas fallback)
+    if (!calendarError) {
+      try {
+        matchedMeetings = await identifyMeetings(anthropic, meetingTitles)
+        todayAreas      = [...new Set(matchedMeetings.flatMap(m => m.config.areas))]
+      } catch {
+        // If AI identification fails, treat as no meetings found
+        matchedMeetings = []
+        todayAreas      = []
+      }
     }
 
     if (todayAreas.length === 0 && !calendarError) {
@@ -340,11 +356,6 @@ export async function POST(request: NextRequest) {
     if (detail) {
       const parentTs = await postToSlack(`*${dateLabel} / OKR Execution Brief* 🧵👇🏼\n${meetingLabel}\n\n${summary}`)
       await postToSlack(detail, parentTs)
-      // Debug: show raw calendar titles so we can verify what was detected
-      if (meetingTitles.length > 0) {
-        const debugLines = meetingTitles.map(t => `• ${t}`).join('\n')
-        await postToSlack(`_📅 Raw calendar events today:_\n${debugLines}`, parentTs)
-      }
     } else {
       await postToSlack(`${meetingLabel}\n\n${summary || raw}`)
     }
