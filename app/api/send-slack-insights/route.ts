@@ -4,6 +4,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentQuarter } from '@/types'
 import { getTodayMeetingTitles, getAreasForMeetings } from '@/lib/google-calendar'
 
+export const maxDuration = 60
+
 const SLACK_CHANNEL = 'C030BRV0C2G' // #cos
 
 async function postToSlack(message: string, threadTs?: string): Promise<string> {
@@ -185,7 +187,7 @@ RULES:
 - Bold metrics with *asterisks*
 - If everything is healthy, write one line saying so. Done.`
 
-    const anthropic = new Anthropic()
+    const anthropic = new Anthropic({ maxRetries: 5 })
     const aiResponse = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 2048,
