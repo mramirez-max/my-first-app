@@ -298,11 +298,22 @@ export async function POST(request: NextRequest) {
       weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/Bogota',
     })
 
+    const meetingLabel = matchedMeetings.length > 0
+      ? `_Triggered by: ${matchedMeetings.map(m => m.keyword).join(', ')}_`
+      : calendarError
+        ? `_⚠️ Calendar unavailable — showing all areas_`
+        : `_No meetings matched_`
+
     if (detail) {
-      const parentTs = await postToSlack(`*${dateLabel} / OKR Execution Brief* 🧵👇🏼\n\n${summary}`)
+      const parentTs = await postToSlack(`*${dateLabel} / OKR Execution Brief* 🧵👇🏼\n${meetingLabel}\n\n${summary}`)
       await postToSlack(detail, parentTs)
+      // Debug: show raw calendar titles so we can verify what was detected
+      if (meetingTitles.length > 0) {
+        const debugLines = meetingTitles.map(t => `• ${t}`).join('\n')
+        await postToSlack(`_📅 Raw calendar events today:_\n${debugLines}`, parentTs)
+      }
     } else {
-      await postToSlack(summary || raw)
+      await postToSlack(`${meetingLabel}\n\n${summary || raw}`)
     }
 
     return NextResponse.json({
