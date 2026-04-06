@@ -162,7 +162,7 @@ export default function BulkImportModal({
             ...obj,
             keyResults: [
               ...obj.keyResults,
-              { description: '', targetValue: 100, currentValue: 0, unit: '' },
+              { description: '', originalDescription: '', targetValue: 100, currentValue: 0, unit: '' },
             ],
           }
         ),
@@ -525,6 +525,18 @@ export default function BulkImportModal({
                                 className="text-sm resize-none bg-white/5 border-white/10 text-white focus:border-[#FF5A70]/50"
                                 placeholder="Objective title..."
                               />
+                              {obj.originalTitle && obj.originalTitle !== obj.title && (
+                                <div className="flex items-start gap-2 px-2 py-1.5 rounded-md bg-white/3 border border-white/6">
+                                  <span className="text-xs text-white/30 shrink-0 mt-0.5">Original:</span>
+                                  <span className="text-xs text-white/40 flex-1 leading-relaxed">{obj.originalTitle}</span>
+                                  <button
+                                    onClick={() => updateObjectiveTitle(areaIdx, objIdx, obj.originalTitle)}
+                                    className="text-xs text-white/30 hover:text-white shrink-0 underline underline-offset-2 transition-colors"
+                                  >
+                                    Use
+                                  </button>
+                                </div>
+                              )}
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="text-xs text-white/40 shrink-0">Aligned to:</span>
                                 <Select
@@ -573,7 +585,7 @@ export default function BulkImportModal({
                               {obj.keyResults.map((kr, krIdx) => (
                                 <div key={krIdx} className="space-y-2 p-3 rounded-lg bg-gradient-to-br from-[#1c1540] to-[#23174B] border border-white/8">
                                   <div className="flex items-start gap-2">
-                                    <div className="flex-1 space-y-1">
+                                    <div className="flex-1 space-y-1.5">
                                       <Label className="text-xs text-white/40">Key Result {krIdx + 1}</Label>
                                       <Textarea
                                         value={kr.description}
@@ -582,6 +594,18 @@ export default function BulkImportModal({
                                         className="text-xs resize-none bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[#FF5A70]/50"
                                         placeholder="KR description..."
                                       />
+                                      {kr.originalDescription && kr.originalDescription !== kr.description && (
+                                        <div className="flex items-start gap-2 px-2 py-1.5 rounded-md bg-white/3 border border-white/6">
+                                          <span className="text-xs text-white/30 shrink-0 mt-0.5">Original:</span>
+                                          <span className="text-xs text-white/40 flex-1 leading-relaxed">{kr.originalDescription}</span>
+                                          <button
+                                            onClick={() => updateKR(areaIdx, objIdx, krIdx, 'description', kr.originalDescription)}
+                                            className="text-xs text-white/30 hover:text-white shrink-0 underline underline-offset-2 transition-colors"
+                                          >
+                                            Use
+                                          </button>
+                                        </div>
+                                      )}
                                     </div>
                                     <button
                                       onClick={() => removeKR(areaIdx, objIdx, krIdx)}

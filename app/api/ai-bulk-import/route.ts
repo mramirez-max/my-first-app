@@ -8,6 +8,7 @@ const client = new Anthropic({ maxRetries: 5 })
 
 export interface BulkKRInput {
   description: string
+  originalDescription: string  // exact wording from the source document
   targetValue: number
   currentValue: number
   unit: string
@@ -15,6 +16,7 @@ export interface BulkKRInput {
 
 export interface BulkObjectiveInput {
   title: string
+  originalTitle: string        // exact wording from the source document
   alignedToIndex: number | null // 0, 1, 2 maps to company objective
   keyResults: BulkKRInput[]
 }
@@ -64,8 +66,8 @@ Extract structured OKRs for each area from the provided document. Rules:
 - currentValue should be 0 unless the document specifies a starting baseline
 - alignedToIndex must be 0, 1, or 2 (matching the company objectives above), or null
 - If an area is not mentioned, include it with an empty objectives array
-- Keep objective titles concise but specific
-- Keep KR descriptions action-oriented and measurable`
+- In originalTitle / originalDescription: copy the wording EXACTLY as it appears in the document — do not change a single word
+- In title / description: you may improve the wording to be more concise, action-oriented, and measurable — but only if the original is vague or not well-formed. If the original is already clear, set title = originalTitle and description = originalDescription`
 
     const messages: Anthropic.MessageParam[] = []
 
@@ -116,6 +118,7 @@ Extract structured OKRs for each area from the provided document. Rules:
                         type: 'object',
                         properties: {
                           title: { type: 'string' },
+                          originalTitle: { type: 'string' },
                           alignedToIndex: { type: ['integer', 'null'] },
                           keyResults: {
                             type: 'array',
@@ -123,15 +126,16 @@ Extract structured OKRs for each area from the provided document. Rules:
                               type: 'object',
                               properties: {
                                 description: { type: 'string' },
+                                originalDescription: { type: 'string' },
                                 targetValue: { type: 'number' },
                                 currentValue: { type: 'number' },
                                 unit: { type: 'string' },
                               },
-                              required: ['description', 'targetValue', 'currentValue', 'unit'],
+                              required: ['description', 'originalDescription', 'targetValue', 'currentValue', 'unit'],
                             },
                           },
                         },
-                        required: ['title', 'alignedToIndex', 'keyResults'],
+                        required: ['title', 'originalTitle', 'alignedToIndex', 'keyResults'],
                       },
                     },
                   },
