@@ -301,7 +301,7 @@ export default function BulkImportModal({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl w-full max-h-[92vh] overflow-y-auto overflow-x-hidden bg-[#1c1540] border-white/10">
+      <DialogContent className="sm:max-w-4xl w-full max-h-[92vh] overflow-y-auto overflow-x-hidden bg-[#1c1540] border-white/10 p-8">
         <DialogHeader>
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-[#FF5A70]/15 flex items-center justify-center shrink-0">
@@ -318,19 +318,19 @@ export default function BulkImportModal({
 
         {/* ── INPUT STEP ── */}
         {step === 'input' && (
-          <div className="space-y-5 mt-2">
+          <div className="space-y-6 mt-2">
             {/* Mode toggle */}
-            <div className="flex gap-2 p-1 bg-white/5 rounded-lg">
+            <div className="flex gap-2 p-1.5 bg-white/5 rounded-xl">
               <button
                 onClick={() => setInputMode('text')}
-                className={cn('flex-1 text-xs py-2 rounded-md font-medium transition-colors',
+                className={cn('flex-1 text-sm py-2.5 rounded-lg font-medium transition-colors',
                   inputMode === 'text' ? 'bg-[#FF5A70] text-white' : 'text-white/50 hover:text-white')}
               >
                 Paste Text
               </button>
               <button
                 onClick={() => setInputMode('pdf')}
-                className={cn('flex-1 text-xs py-2 rounded-md font-medium transition-colors',
+                className={cn('flex-1 text-sm py-2.5 rounded-lg font-medium transition-colors',
                   inputMode === 'pdf' ? 'bg-[#FF5A70] text-white' : 'text-white/50 hover:text-white')}
               >
                 Upload PDF
@@ -338,8 +338,8 @@ export default function BulkImportModal({
             </div>
 
             {inputMode === 'text' ? (
-              <div className="space-y-2">
-                <p className="text-xs text-white/50">
+              <div className="space-y-3">
+                <p className="text-sm text-white/50 leading-relaxed">
                   Paste your OKR document — Notion export, Google Doc text, meeting notes, spreadsheet content, etc.
                   Include area names and Claude will figure out the structure.
                 </p>
@@ -347,8 +347,8 @@ export default function BulkImportModal({
                   placeholder={`Example:\n\nOperations\n- Objective: Improve delivery efficiency\n  KR1: Reduce average delivery time to 3 days (currently 5)\n  KR2: Achieve 95% on-time rate\n\nRevenue\n- Objective: Hit $27.2M ARR...`}
                   value={pastedText}
                   onChange={e => setPastedText(e.target.value)}
-                  rows={12}
-                  className="text-sm resize-none bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[#FF5A70]/50"
+                  rows={14}
+                  className="w-full text-sm resize-none bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[#FF5A70]/50"
                 />
               </div>
             ) : (
@@ -387,16 +387,16 @@ export default function BulkImportModal({
             )}
 
             {/* Company OKR reference */}
-            <div className="rounded-lg bg-white/4 border border-white/8 p-3 space-y-1.5">
-              <p className="text-xs font-semibold text-white/50 uppercase tracking-wide">
-                Claude will align areas to these company objectives:
+            <div className="rounded-xl bg-white/4 border border-white/8 p-5 space-y-3">
+              <p className="text-xs font-semibold text-white/40 uppercase tracking-widest">
+                Claude will align areas to these company objectives
               </p>
               {coTitles.map((title, i) => (
-                <div key={i} className="flex items-start gap-2">
-                  <span className={cn('text-xs px-1.5 py-0.5 rounded border font-bold shrink-0', ALIGNMENT_COLORS[i])}>
+                <div key={i} className="flex items-start gap-3">
+                  <span className={cn('text-xs px-2 py-0.5 rounded border font-bold shrink-0 mt-0.5', ALIGNMENT_COLORS[i])}>
                     CO{i + 1}
                   </span>
-                  <span className="text-xs text-white/60 leading-relaxed">{title}</span>
+                  <span className="text-sm text-white/60 leading-relaxed">{title}</span>
                 </div>
               ))}
             </div>
@@ -407,12 +407,12 @@ export default function BulkImportModal({
               </p>
             )}
 
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={handleClose} className="flex-1">Cancel</Button>
+            <div className="flex gap-3 pt-2">
+              <Button variant="outline" onClick={handleClose} className="flex-1 h-11">Cancel</Button>
               <Button
                 onClick={handleGenerate}
                 disabled={inputMode === 'pdf' ? !pdfFile : !pastedText.trim()}
-                className="flex-1 gap-2 bg-[#FF5A70] hover:bg-[#ff3f58] text-white"
+                className="flex-1 h-11 gap-2 bg-[#FF5A70] hover:bg-[#ff3f58] text-white"
               >
                 <Sparkles size={14} /> Generate with AI
               </Button>
@@ -436,7 +436,7 @@ export default function BulkImportModal({
 
         {/* ── PREVIEW ── */}
         {step === 'preview' && (
-          <div className="space-y-4 mt-2">
+          <div className="space-y-5 mt-2">
             {/* Summary bar */}
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-3">
@@ -635,14 +635,14 @@ export default function BulkImportModal({
               </p>
             )}
 
-            <div className="flex gap-2 pt-1 border-t border-white/8">
-              <Button variant="outline" onClick={() => setStep('input')} className="flex-1">
+            <div className="flex gap-3 pt-3 border-t border-white/8">
+              <Button variant="outline" onClick={() => setStep('input')} className="flex-1 h-11">
                 Start over
               </Button>
               <Button
                 onClick={handleSave}
                 disabled={totalObjectives === 0}
-                className="flex-1 gap-2 bg-[#FF5A70] hover:bg-[#ff3f58] text-white"
+                className="flex-1 h-11 gap-2 bg-[#FF5A70] hover:bg-[#ff3f58] text-white"
               >
                 <Check size={14} />
                 Save {totalObjectives} Objective{totalObjectives !== 1 ? 's' : ''} to DB
