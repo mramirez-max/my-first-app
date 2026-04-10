@@ -1,9 +1,12 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { calcProgress } from '@/types'
-import { Loader2, FileDown, TrendingUp, TrendingDown, Minus, AlertCircle, Clock } from 'lucide-react'
+import { calcProgress, Profile, AreaObjective, CompanyObjective } from '@/types'
+import { Loader2, FileDown, TrendingUp, TrendingDown, Minus, AlertCircle, Clock, PlusCircle } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
+import OKRCard from '@/components/okr/OKRCard'
+import ObjectiveDialog from '@/components/okr/ObjectiveDialog'
+import { useRouter } from 'next/navigation'
 
 interface KRUpdate {
   id: string
@@ -24,29 +27,14 @@ interface KeyResult {
   updates?: KRUpdate[]
 }
 
-interface AlignedObjective {
-  id: string
-  title: string
-}
-
-interface AreaObjective {
-  id: string
-  title: string
-  aligned_to: string | null
-  aligned_objective?: AlignedObjective | null
-  key_results?: KeyResult[]
-}
-
-interface CompanyObjective {
-  id: string
-  title: string
-}
-
 interface MyTeamClientProps {
   objectives: AreaObjective[]
   companyObjectives: CompanyObjective[]
   quarter: number
   year: number
+  isAdmin: boolean
+  profile: Profile
+  operationsAreaId: string
 }
 
 const CONFIDENCE_COLORS: Record<number, string> = {
@@ -234,13 +222,21 @@ function KRCard({ kr, weeks, currentWeek }: { kr: KeyResult; weeks: string[]; cu
   )
 }
 
-export default function MyTeamClient({ objectives, companyObjectives, quarter, year }: MyTeamClientProps) {
+export default function MyTeamClient({ objectives, companyObjectives, quarter, year, isAdmin, profile, operationsAreaId }: MyTeamClientProps) {
   const [generating, setGenerating] = useState(false)
   const [report, setReport] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [showObjectiveDialog, setShowObjectiveDialog] = useState(false)
+  const router = useRouter()
 
   const weeks = useMemo(() => getLastNWeeks(6), [])
   const currentWeek = useMemo(() => getCurrentWeekMonday(), [])
+
+  const canEdit = isAdmin || profile.role === 'area_lead'
+
+  function handleRefresh() {
+    router.refresh()
+  }
 
   // Quick stats
   const allKRs = objectives.flatMap(o => o.key_results ?? [])
@@ -274,6 +270,66 @@ export default function MyTeamClient({ objectives, companyObjectives, quarter, y
     }
   }
 
+  // --- Team member view (non-admin) ---
+  if (!isAdmin) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-white/50">
+            {objectives.length === 0
+              ? `No OKRs set for Q${quarter} ${year} yet.`
+              : `${objectives.length} objective${objectives.length !== 1 ? 's' : ''} · Q${quarter} ${year}`}
+          </p>
+          {canEdit && (
+            <button
+              onClick={() => setShowObjectiveDialog(true)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-gradient-to-br from-[#FF5A70] to-[#4A268C] text-white hover:opacity-90 transition-opacity"
+            >
+              <PlusCircle size={14} />
+              Add Objective
+            </button>
+          )}
+        </div>
+
+        {objectives.length === 0 && canEdit && (
+          <div className="rounded-xl border border-white/8 bg-gradient-to-br from-[#1c1540] to-[#23174B] p-8 text-center space-y-3">
+            <Clock size={32} className="text-white/20 mx-auto" />
+            <p className="text-white/50 text-sm">No team OKRs yet. Add your first objective to get started.</p>
+            <button
+              onClick={() => setShowObjectiveDialog(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-br from-[#FF5A70] to-[#4A268C] text-white hover:opacity-90 transition-opacity"
+            >
+              <PlusCircle size={14} />
+              Add Objective
+            </button>
+          </div>
+        )}
+
+        {objectives.map(obj => (
+          <OKRCard
+            key={obj.id}
+            objective={obj as AreaObjective}
+            type="area"
+            profile={profile}
+            companyObjectives={companyObjectives as import('@/types').CompanyObjective[]}
+            onRefresh={handleRefresh}
+            isCurrentQuarter={true}
+          />
+        ))}
+
+        <ObjectiveDialog
+          open={showObjectiveDialog}
+          onClose={() => setShowObjectiveDialog(false)}
+          type="area"
+          areaId={operationsAreaId}
+          companyObjectives={companyObjectives as import('@/types').CompanyObjective[]}
+          onSuccess={handleRefresh}
+        />
+      </div>
+    )
+  }
+
+  // --- Admin/manager view ---
   if (objectives.length === 0) {
     return (
       <div className="rounded-xl border border-white/8 bg-gradient-to-br from-[#1c1540] to-[#23174B] p-8 text-center">
@@ -303,7 +359,7 @@ export default function MyTeamClient({ objectives, companyObjectives, quarter, y
       {/* Objectives + KRs */}
       <div className="space-y-6">
         {objectives.map(obj => {
-          const alignedTitle = (obj.aligned_objective as AlignedObjective | null)?.title
+          const alignedTitle = (obj.aligned_objective as { title?: string } | null)?.title
           return (
             <section key={obj.id} className="rounded-xl border border-white/8 bg-gradient-to-br from-[#1c1540] to-[#23174B] p-5 space-y-4">
               <div>

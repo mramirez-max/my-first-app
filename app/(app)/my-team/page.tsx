@@ -17,24 +17,27 @@ export default async function MyTeamPage({
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('id, full_name, role, area_id, created_at')
     .eq('id', user.id)
     .single()
 
-  if (profile?.role !== 'admin') redirect('/')
+  // Find Operations area first so we can check membership
+  const { data: operationsAreaCheck } = await supabase
+    .from('areas')
+    .select('id')
+    .eq('name', 'Operations')
+    .single()
+
+  const isAdmin = profile?.role === 'admin'
+  const isOperationsMember = profile?.area_id === operationsAreaCheck?.id
+  if (!isAdmin && !isOperationsMember) redirect('/')
 
   const { quarter: currentQ, year: currentY } = getCurrentQuarter()
   const params = await searchParams
   const quarter = params.q ? parseInt(params.q) : currentQ
   const year = params.y ? parseInt(params.y) : currentY
 
-  // Find Operations area
-  const { data: operationsArea } = await supabase
-    .from('areas')
-    .select('id, name')
-    .eq('name', 'Operations')
-    .single()
-
+  const operationsArea = operationsAreaCheck
   if (!operationsArea) redirect('/executive')
 
   // Fetch Operations objectives + KRs + all updates for the quarter
@@ -92,9 +95,12 @@ export default async function MyTeamPage({
 
       <MyTeamClient
         objectives={(objectives ?? []) as unknown as Parameters<typeof MyTeamClient>[0]['objectives']}
-        companyObjectives={companyObjectives ?? []}
+        companyObjectives={(companyObjectives ?? []) as unknown as Parameters<typeof MyTeamClient>[0]['companyObjectives']}
         quarter={quarter}
         year={year}
+        isAdmin={isAdmin}
+        profile={profile as unknown as Parameters<typeof MyTeamClient>[0]['profile']}
+        operationsAreaId={operationsArea.id}
       />
     </div>
   )
