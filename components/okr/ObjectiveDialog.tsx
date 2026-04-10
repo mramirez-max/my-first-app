@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils'
 interface ObjectiveDialogProps {
   open: boolean
   onClose: () => void
-  type: 'area' | 'company'
+  type: 'area' | 'company' | 'team'
   existing?: AreaObjective | CompanyObjective
   companyObjectives?: CompanyObjective[]
   areaId?: string
@@ -52,7 +52,7 @@ export default function ObjectiveDialog({
     setAlignedTo((existing as AreaObjective)?.aligned_to ?? null)
   }, [existing, open, initialTitle])
 
-  const table = type === 'area' ? 'area_objectives' : 'company_objectives'
+  const table = type === 'area' ? 'area_objectives' : type === 'team' ? 'team_objectives' : 'company_objectives'
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -69,7 +69,7 @@ export default function ObjectiveDialog({
       created_by: user.id,
     }
 
-    if (type === 'area') {
+    if (type === 'area' || type === 'team') {
       payload.area_id = areaId
       payload.aligned_to = alignedTo ?? null
     }
@@ -77,7 +77,7 @@ export default function ObjectiveDialog({
     let err
     if (existing) {
       const { error: e } = await supabase.from(table)
-        .update({ title, ...(type === 'area' ? { aligned_to: alignedTo } : {}) })
+        .update({ title, ...((type === 'area' || type === 'team') ? { aligned_to: alignedTo } : {}) })
         .eq('id', existing.id)
       err = e
     } else {
@@ -97,7 +97,7 @@ export default function ObjectiveDialog({
       <DialogContent className="max-w-lg bg-[#1c1540] border-white/10">
         <DialogHeader>
           <DialogTitle className="text-white">{existing ? 'Edit Objective' : 'Add Objective'}</DialogTitle>
-          {type === 'area' && !existing && (
+          {(type === 'area' || type === 'team') && !existing && (
             <DialogDescription className="text-white/50">
               Link your objective to a company goal so it shows up in the cascade view.
             </DialogDescription>
@@ -105,8 +105,8 @@ export default function ObjectiveDialog({
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-5 mt-2">
 
-          {/* Step 1: Align to company objective (area only) */}
-          {type === 'area' && companyObjectives && companyObjectives.length > 0 && (
+          {/* Step 1: Align to company objective (area/team only) */}
+          {(type === 'area' || type === 'team') && companyObjectives && companyObjectives.length > 0 && (
             <div className="space-y-2">
               <Label className="text-sm font-semibold text-white/70">
                 Which company objective does this support?

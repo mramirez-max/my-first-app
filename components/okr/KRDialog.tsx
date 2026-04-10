@@ -18,7 +18,7 @@ interface KRDialogProps {
   open: boolean
   onClose: () => void
   objectiveId: string
-  type: 'area' | 'company'
+  type: 'area' | 'company' | 'team'
   existing?: AreaKeyResult | CompanyKeyResult
   onSuccess: () => void
 }
@@ -38,7 +38,7 @@ export default function KRDialog({ open, onClose, objectiveId, type, existing, o
     setError(null)
   }, [existing, open])
 
-  const table = type === 'area' ? 'area_key_results' : 'company_key_results'
+  const table = type === 'area' ? 'area_key_results' : type === 'team' ? 'team_key_results' : 'company_key_results'
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()

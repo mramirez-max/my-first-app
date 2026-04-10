@@ -12,7 +12,7 @@ import { createClient } from '@/lib/supabase/client'
 
 interface KeyResultRowProps {
   keyResult: AreaKeyResult | CompanyKeyResult
-  type: 'area' | 'company'
+  type: 'area' | 'company' | 'team'
   canUpdate: boolean
   canEdit?: boolean
   onEdit?: () => void
@@ -44,7 +44,7 @@ export default function KeyResultRow({
   async function handleDelete() {
     if (!confirm('Delete this key result and all its updates? This cannot be undone.')) return
     setDeleting(true)
-    const table = type === 'area' ? 'area_key_results' : 'company_key_results'
+    const table = type === 'area' ? 'area_key_results' : type === 'team' ? 'team_key_results' : 'company_key_results'
     await supabase.from(table).delete().eq('id', keyResult.id)
     setDeleting(false)
     onDeleted?.()

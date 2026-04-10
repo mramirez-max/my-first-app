@@ -32,15 +32,15 @@ export async function POST(req: NextRequest) {
 
     if (!operationsArea) return NextResponse.json({ error: 'Operations area not found' }, { status: 404 })
 
-    // Fetch Operations OKRs with all updates for the quarter
+    // Fetch team OKRs with all updates for the quarter (independent from area_objectives)
     const { data: objectives, error: dbError } = await supabase
-      .from('area_objectives')
+      .from('team_objectives')
       .select(`
         title, aligned_to,
         aligned_objective:company_objectives(title),
-        key_results:area_key_results(
+        key_results:team_key_results(
           id, description, target_value, current_value, unit,
-          updates:area_kr_updates(confidence_score, update_text, week_date, created_at)
+          updates:team_kr_updates(confidence_score, update_text, week_date, created_at)
         )
       `)
       .eq('area_id', operationsArea.id)

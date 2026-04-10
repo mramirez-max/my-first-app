@@ -8,7 +8,7 @@ import WeeklyUpdateForm from './WeeklyUpdateForm'
 
 interface UpdateFeedProps {
   keyResultId: string
-  type: 'area' | 'company'
+  type: 'area' | 'company' | 'team'
   refreshKey?: number
   canEdit?: boolean
   currentValue?: number
@@ -35,7 +35,7 @@ export default function UpdateFeed({ keyResultId, type, refreshKey, canEdit, cur
     setInternalRefresh(k => k + 1)
   }
 
-  const table = type === 'area' ? 'area_kr_updates' : 'company_kr_updates'
+  const table = type === 'area' ? 'area_kr_updates' : type === 'team' ? 'team_kr_updates' : 'company_kr_updates'
 
   useEffect(() => {
     async function fetchUpdates() {

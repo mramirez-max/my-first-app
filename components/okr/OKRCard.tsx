@@ -13,7 +13,7 @@ import { createClient } from '@/lib/supabase/client'
 
 interface OKRCardProps {
   objective: AreaObjective | CompanyObjective
-  type: 'area' | 'company'
+  type: 'area' | 'company' | 'team'
   profile: Profile
   companyObjectives?: CompanyObjective[]
   onRefresh: () => void
@@ -34,7 +34,7 @@ export default function OKRCard({ objective, type, profile, companyObjectives, o
   async function handleDeleteObjective() {
     if (!confirm('Delete this objective and all its key results? This cannot be undone.')) return
     setDeletingObj(true)
-    const table = type === 'area' ? 'area_objectives' : 'company_objectives'
+    const table = type === 'area' ? 'area_objectives' : type === 'team' ? 'team_objectives' : 'company_objectives'
     await supabase.from(table).delete().eq('id', objective.id)
     setDeletingObj(false)
     onRefresh()
@@ -47,11 +47,11 @@ export default function OKRCard({ objective, type, profile, companyObjectives, o
 
   const canEdit = isCurrentQuarter && (
     profile.role === 'admin' ||
-    (profile.role === 'area_lead' && type === 'area' && isAreaObjective(objective) && objective.area_id === profile.area_id)
+    (profile.role === 'area_lead' && (type === 'area' || type === 'team') && isAreaObjective(objective) && objective.area_id === profile.area_id)
   )
 
   const canUpdate = isCurrentQuarter && (canEdit || (
-    profile.role === 'team_member' && type === 'area' &&
+    profile.role === 'team_member' && (type === 'area' || type === 'team') &&
     isAreaObjective(objective) && objective.area_id === profile.area_id
   ))
 

@@ -19,7 +19,7 @@ interface WeeklyUpdateFormProps {
   open: boolean
   onClose: () => void
   keyResultId: string
-  type: 'area' | 'company'
+  type: 'area' | 'company' | 'team'
   currentValue: number
   onSuccess: () => void
   existing?: AreaKRUpdate | CompanyKRUpdate
@@ -42,7 +42,7 @@ export default function WeeklyUpdateForm({
   const [error, setError] = useState<string | null>(null)
 
   const isEditing = !!existing
-  const table = type === 'area' ? 'area_kr_updates' : 'company_kr_updates'
+  const table = type === 'area' ? 'area_kr_updates' : type === 'team' ? 'team_kr_updates' : 'company_kr_updates'
 
   // Reset form when existing changes (e.g. opening a different update to edit)
   useState(() => {
@@ -99,7 +99,7 @@ export default function WeeklyUpdateForm({
       }
 
       // Update the key result's current value only on new updates
-      const krTable = type === 'area' ? 'area_key_results' : 'company_key_results'
+      const krTable = type === 'area' ? 'area_key_results' : type === 'team' ? 'team_key_results' : 'company_key_results'
       await supabase
         .from(krTable)
         .update({ current_value: parseFloat(value) })

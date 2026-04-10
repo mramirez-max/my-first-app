@@ -41,15 +41,15 @@ export default async function MyTeamPage({
   const operationsArea = operationsAreaCheck
   if (!operationsArea) redirect('/executive')
 
-  // Fetch Operations objectives + KRs + all updates for the quarter
+  // Fetch team objectives + KRs + all updates for the quarter (independent from area_objectives)
   const { data: objectives } = await supabase
-    .from('area_objectives')
+    .from('team_objectives')
     .select(`
       id, title, aligned_to, created_at,
       aligned_objective:company_objectives(id, title),
-      key_results:area_key_results(
+      key_results:team_key_results(
         id, description, target_value, current_value, unit,
-        updates:area_kr_updates(
+        updates:team_kr_updates(
           id, confidence_score, current_value, update_text, week_date, created_at,
           author:profiles(full_name)
         )

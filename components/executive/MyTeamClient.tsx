@@ -309,7 +309,7 @@ export default function MyTeamClient({ objectives, companyObjectives, quarter, y
           <OKRCard
             key={obj.id}
             objective={obj as AreaObjective}
-            type="area"
+            type="team"
             profile={profile}
             companyObjectives={companyObjectives as import('@/types').CompanyObjective[]}
             onRefresh={handleRefresh}
@@ -320,7 +320,7 @@ export default function MyTeamClient({ objectives, companyObjectives, quarter, y
         <ObjectiveDialog
           open={showObjectiveDialog}
           onClose={() => setShowObjectiveDialog(false)}
-          type="area"
+          type="team"
           areaId={operationsAreaId}
           companyObjectives={companyObjectives as import('@/types').CompanyObjective[]}
           onSuccess={handleRefresh}
@@ -377,7 +377,7 @@ export default function MyTeamClient({ objectives, companyObjectives, quarter, y
             <OKRCard
               key={obj.id}
               objective={obj as AreaObjective}
-              type="area"
+              type="team"
               profile={profile}
               companyObjectives={companyObjectives as import('@/types').CompanyObjective[]}
               onRefresh={handleRefresh}
@@ -389,7 +389,7 @@ export default function MyTeamClient({ objectives, companyObjectives, quarter, y
         <ObjectiveDialog
           open={showObjectiveDialog}
           onClose={() => setShowObjectiveDialog(false)}
-          type="area"
+          type="team"
           areaId={operationsAreaId}
           companyObjectives={companyObjectives as import('@/types').CompanyObjective[]}
           onSuccess={handleRefresh}
