@@ -94,51 +94,45 @@ export default function ObjectiveDialog({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg bg-[#1c1540] border-white/10">
-        <DialogHeader>
-          <DialogTitle className="text-white">{existing ? 'Edit Objective' : 'Add Objective'}</DialogTitle>
+      <DialogContent className="max-w-[720px] w-full bg-[#1c1540] border-white/10 px-8 py-7">
+        <DialogHeader className="mb-6">
+          <DialogTitle className="text-white text-xl">{existing ? 'Edit Objective' : 'Add Objective'}</DialogTitle>
           {(type === 'area' || type === 'team') && !existing && (
-            <DialogDescription className="text-white/50">
-              Link your objective to a company goal so it shows up in the cascade view.
+            <DialogDescription className="text-white/50 mt-1.5">
+              Link your objective to an area goal so it shows up in the cascade view.
             </DialogDescription>
           )}
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-5 mt-2">
+        <form onSubmit={handleSubmit} className="space-y-7">
 
-          {/* Step 1: Align to company objective (area/team only) */}
+          {/* Step 1: Align to area objective (team only) / company objective (area) */}
           {(type === 'area' || type === 'team') && companyObjectives && companyObjectives.length > 0 && (
-            <div className="space-y-2">
-              <Label className="text-sm font-semibold text-white/70">
-                Which company objective does this support?
+            <div className="space-y-3">
+              <Label className="text-sm font-semibold text-white/70 tracking-wide uppercase text-xs">
+                Which {type === 'team' ? 'area' : 'company'} objective does this support?
               </Label>
-              <div className="space-y-2">
-                {companyObjectives.map((co, i) => {
+              <div className="space-y-2.5">
+                {companyObjectives.map((co) => {
                   const selected = alignedTo === co.id
-                  const selectedColors = [
-                    'border-[#FF5A70] bg-[#FF5A70]/10 text-white',
-                    'border-[#FF5A70] bg-[#FF5A70]/10 text-white',
-                    'border-[#FF5A70] bg-[#FF5A70]/10 text-white',
-                  ]
-                  const selectedColor = selectedColors[i % selectedColors.length]
                   return (
                     <button
                       key={co.id}
                       type="button"
                       onClick={() => setAlignedTo(selected ? null : co.id)}
                       className={cn(
-                        'w-full text-left flex items-start gap-3 p-3 rounded-lg border-2 transition-all',
+                        'w-full text-left flex items-start gap-4 px-4 py-3.5 rounded-xl border-2 transition-all',
                         selected
-                          ? selectedColor
-                          : 'border-white/10 bg-white/5 text-white/60 hover:border-white/20 hover:bg-white/8'
+                          ? 'border-[#FF5A70] bg-[#FF5A70]/10 text-white'
+                          : 'border-white/10 bg-white/5 text-white/60 hover:border-white/25 hover:bg-white/8 hover:text-white/80'
                       )}
                     >
                       <span className="mt-0.5 shrink-0">
                         {selected
-                          ? <CheckCircle2 size={16} className="text-[#FF5A70]" />
-                          : <Circle size={16} className="text-white/30" />
+                          ? <CheckCircle2 size={18} className="text-[#FF5A70]" />
+                          : <Circle size={18} className="text-white/25" />
                         }
                       </span>
-                      <span className="text-sm font-medium leading-snug">{co.title}</span>
+                      <span className="text-sm font-medium leading-relaxed">{co.title}</span>
                     </button>
                   )
                 })}
@@ -146,7 +140,7 @@ export default function ObjectiveDialog({
                   <button
                     type="button"
                     onClick={() => setAlignedTo(null)}
-                    className="text-xs text-white/40 hover:text-white/60 underline"
+                    className="text-xs text-white/40 hover:text-white/60 underline pl-1"
                   >
                     Clear alignment
                   </button>
@@ -156,8 +150,8 @@ export default function ObjectiveDialog({
           )}
 
           {/* Objective title */}
-          <div className="space-y-2">
-            <Label htmlFor="title" className="text-sm font-semibold text-white/70">
+          <div className="space-y-2.5">
+            <Label htmlFor="title" className="text-sm font-semibold text-white/70 tracking-wide uppercase text-xs">
               {type === 'area' ? 'Your area objective' : 'Objective title'}
             </Label>
             <Input
@@ -166,25 +160,25 @@ export default function ObjectiveDialog({
               value={title}
               onChange={e => setTitle(e.target.value)}
               required
-              className="bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[#FF5A70]/50"
+              className="bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[#FF5A70]/50 h-11"
             />
           </div>
 
-          {error && <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 p-2 rounded">{error}</p>}
+          {error && <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 p-3 rounded-lg">{error}</p>}
 
-          <div className="flex gap-2 pt-1">
+          <div className="flex gap-3 pt-1">
             <Button
               type="button"
               variant="outline"
               onClick={onClose}
-              className="flex-1 border-white/15 text-white/80 hover:bg-white/5 hover:text-white"
+              className="flex-1 border-white/15 text-white/80 hover:bg-white/5 hover:text-white h-11"
             >
               Cancel
             </Button>
             <Button
               type="submit"
               disabled={loading}
-              className="flex-1 bg-[#FF5A70] hover:bg-[#ff3f58] text-white"
+              className="flex-1 bg-[#FF5A70] hover:bg-[#ff3f58] text-white h-11"
             >
               {loading ? 'Saving...' : existing ? 'Save Changes' : 'Add Objective'}
             </Button>
