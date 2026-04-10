@@ -30,7 +30,8 @@ export default async function MyTeamPage({
 
   const isAdmin = profile?.role === 'admin'
   const isOperationsMember = profile?.area_id === operationsAreaCheck?.id
-  if (!isAdmin && !isOperationsMember) redirect('/')
+  // Only Operations area members get access (admins must also be assigned to Operations)
+  if (!isOperationsMember) redirect('/')
 
   const { quarter: currentQ, year: currentY } = getCurrentQuarter()
   const params = await searchParams

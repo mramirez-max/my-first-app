@@ -103,8 +103,8 @@ export default function Sidebar({ profile, areas }: SidebarProps) {
           </div>
         </div>
 
-        {/* My Team — visible to Operations members and admins */}
-        {(profile?.role === 'admin' || profile?.area?.name === 'Operations') && (
+        {/* My Team — visible to Operations area members only */}
+        {profile?.area?.name === 'Operations' && (
           <div className="pt-4 space-y-0.5">
             <NavItem href="/my-team" icon={<Users size={16} />} active={pathname === '/my-team'}>
               My Team

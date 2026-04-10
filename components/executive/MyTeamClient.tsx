@@ -330,15 +330,6 @@ export default function MyTeamClient({ objectives, companyObjectives, quarter, y
   }
 
   // --- Admin/manager view ---
-  if (objectives.length === 0) {
-    return (
-      <div className="rounded-xl border border-white/8 bg-gradient-to-br from-[#1c1540] to-[#23174B] p-8 text-center">
-        <Clock size={32} className="text-white/20 mx-auto mb-3" />
-        <p className="text-white/50 text-sm">No OKRs set for Operations in Q{quarter} {year}.</p>
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-6">
       {/* Stats bar */}
@@ -356,33 +347,53 @@ export default function MyTeamClient({ objectives, companyObjectives, quarter, y
         ))}
       </div>
 
-      {/* Objectives + KRs */}
-      <div className="space-y-6">
-        {objectives.map(obj => {
-          const alignedTitle = (obj.aligned_objective as { title?: string } | null)?.title
-          return (
-            <section key={obj.id} className="rounded-xl border border-white/8 bg-gradient-to-br from-[#1c1540] to-[#23174B] p-5 space-y-4">
-              <div>
-                <h3 className="text-base font-semibold text-white">{obj.title}</h3>
-                {alignedTitle && (
-                  <p className="text-xs text-white/35 mt-0.5">
-                    Contributes to: <span className="text-white/50">{alignedTitle}</span>
-                  </p>
-                )}
-              </div>
+      {/* OKR management + week-over-week tracking */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-white/60 uppercase tracking-wide">Team OKRs</h3>
+          <button
+            onClick={() => setShowObjectiveDialog(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-white/15 text-white/50 hover:text-white hover:bg-white/5 transition-colors print:hidden"
+          >
+            <PlusCircle size={12} />
+            Add Objective
+          </button>
+        </div>
 
-              {(obj.key_results ?? []).length === 0 ? (
-                <p className="text-sm text-white/35 italic">No key results defined.</p>
-              ) : (
-                <div className="grid gap-3">
-                  {(obj.key_results ?? []).map(kr => (
-                    <KRCard key={kr.id} kr={kr} weeks={weeks} currentWeek={currentWeek} />
-                  ))}
-                </div>
-              )}
-            </section>
-          )
-        })}
+        {objectives.length === 0 ? (
+          <div className="rounded-xl border border-white/8 bg-gradient-to-br from-[#1c1540] to-[#23174B] p-8 text-center space-y-3">
+            <Clock size={32} className="text-white/20 mx-auto" />
+            <p className="text-white/50 text-sm">No OKRs set for Operations in Q{quarter} {year}.</p>
+            <button
+              onClick={() => setShowObjectiveDialog(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-br from-[#FF5A70] to-[#4A268C] text-white hover:opacity-90 transition-opacity"
+            >
+              <PlusCircle size={14} />
+              Add Objective
+            </button>
+          </div>
+        ) : (
+          objectives.map(obj => (
+            <OKRCard
+              key={obj.id}
+              objective={obj as AreaObjective}
+              type="area"
+              profile={profile}
+              companyObjectives={companyObjectives as import('@/types').CompanyObjective[]}
+              onRefresh={handleRefresh}
+              isCurrentQuarter={true}
+            />
+          ))
+        )}
+
+        <ObjectiveDialog
+          open={showObjectiveDialog}
+          onClose={() => setShowObjectiveDialog(false)}
+          type="area"
+          areaId={operationsAreaId}
+          companyObjectives={companyObjectives as import('@/types').CompanyObjective[]}
+          onSuccess={handleRefresh}
+        />
       </div>
 
       {/* Report section */}
