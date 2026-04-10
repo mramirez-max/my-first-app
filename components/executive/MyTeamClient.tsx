@@ -93,13 +93,13 @@ function formatWeekLabel(dateStr: string): string {
 }
 
 const MD_COMPONENTS: React.ComponentProps<typeof import('react-markdown').default>['components'] = {
-  h2: ({ children }) => <h2 className="text-base font-semibold text-white mt-5 mb-2 first:mt-0">{children}</h2>,
-  h3: ({ children }) => <h3 className="text-sm font-semibold text-white/90 mt-3 mb-1">{children}</h3>,
-  strong: ({ children }) => <strong className="font-semibold text-white">{children}</strong>,
+  h2: ({ children }) => <h2 className="text-base font-semibold text-white print:text-gray-900 mt-5 mb-2 first:mt-0 pb-1 border-b border-white/10 print:border-gray-200">{children}</h2>,
+  h3: ({ children }) => <h3 className="text-sm font-semibold text-white/90 print:text-gray-800 mt-3 mb-1">{children}</h3>,
+  strong: ({ children }) => <strong className="font-semibold text-white print:text-gray-900">{children}</strong>,
   ul: ({ children }) => <ul className="list-disc list-inside space-y-1 my-1.5">{children}</ul>,
   ol: ({ children }) => <ol className="list-decimal list-inside space-y-1 my-1.5">{children}</ol>,
-  li: ({ children }) => <li className="text-white/80 text-sm">{children}</li>,
-  p: ({ children }) => <p className="text-white/75 text-sm mb-2 last:mb-0">{children}</p>,
+  li: ({ children }) => <li className="text-white/80 print:text-gray-700 text-sm">{children}</li>,
+  p: ({ children }) => <p className="text-white/75 print:text-gray-700 text-sm mb-2 last:mb-0">{children}</p>,
 }
 
 function KRWeekTrend({ updates, weeks }: { updates: KRUpdate[]; weeks: string[] }) {
