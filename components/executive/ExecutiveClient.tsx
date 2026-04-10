@@ -510,7 +510,7 @@ export default function ExecutiveClient({
 
       {/* Insights panel */}
       {activeTab === 'insights' && (
-        <InsightsPanel insights={insights} areaData={areaData} areas={areas} quarter={quarter} year={year} />
+        <InsightsPanel insights={insights} areaData={areaData} areas={areas} quarter={quarter} year={year} isAdmin={isAdmin} />
       )}
 
       {/* Documents tab */}

@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
-import { AlertCircle, Clock, TrendingDown, Sparkles, CheckCircle2, ChevronLeft, ChevronRight, Pencil, BellOff, X } from 'lucide-react'
+import { AlertCircle, Clock, TrendingDown, Sparkles, CheckCircle2, ChevronLeft, ChevronRight, Pencil, BellOff, X, Users } from 'lucide-react'
 import { Area } from '@/types'
+import Link from 'next/link'
 
 export interface ComputedInsight {
   type: 'missing' | 'stale' | 'at_risk'
@@ -27,6 +28,7 @@ interface InsightsPanelProps {
   areas: Area[]
   quarter: number
   year: number
+  isAdmin?: boolean
 }
 
 const TYPE_CONFIG = {
@@ -51,7 +53,7 @@ function insightKey(ins: { type: string; area: string; krId?: string; message: s
   return `${ins.type}:${ins.area}:${ins.krId ?? ins.message.slice(0, 40)}`
 }
 
-export default function InsightsPanel({ insights, areaData, areas, quarter, year }: InsightsPanelProps) {
+export default function InsightsPanel({ insights, areaData, areas, quarter, year, isAdmin }: InsightsPanelProps) {
   const [aiInsights, setAiInsights] = useState<{ area: string; message: string }[]>([])
   const [scanning, setScanning]     = useState(false)
   const [scanned, setScanned]       = useState(false)
@@ -500,6 +502,19 @@ export default function InsightsPanel({ insights, areaData, areas, quarter, year
           {' · '}
           <button onClick={unhideAll} className="underline hover:text-white/50">clear all</button>
         </p>
+      )}
+
+      {/* Manager shortcut — admin only */}
+      {isAdmin && (
+        <div className="flex justify-end pt-1">
+          <Link
+            href="/my-team"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white/40 hover:text-white hover:bg-white/8 border border-white/8 hover:border-white/15 transition-all"
+          >
+            <Users size={12} />
+            My Team OKRs
+          </Link>
+        </div>
       )}
     </section>
   )

@@ -131,6 +131,14 @@
   }
 }
 
+/* Print styles — used by My Team weekly report PDF export */
+@media print {
+  nav, aside, [data-sidebar], .print\:hidden { display: none !important; }
+  body { background: white !important; color: black !important; }
+  .print\:p-0 { padding: 0 !important; }
+  .print\:max-w-none { max-width: none !important; }
+}
+
 /* Ontop glow utility */
 .ontop-glow {
   position: relative;
