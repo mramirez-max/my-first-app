@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
       .from('team_objectives')
       .select(`
         title, aligned_to,
-        aligned_objective:company_objectives(title),
+        aligned_objective:area_objectives(title),
         key_results:team_key_results(
           id, description, target_value, current_value, unit,
           updates:team_kr_updates(confidence_score, update_text, week_date, created_at)
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
     const objSummaries = (objectives ?? []).map(obj => {
       const alignedTitle = (obj.aligned_objective as { title?: string } | null)?.title
       const header = alignedTitle
-        ? `Objective: "${obj.title}" (aligned to company OKR: "${alignedTitle}")`
+        ? `Objective: "${obj.title}" (aligned to area OKR: "${alignedTitle}")`
         : `Objective: "${obj.title}"`
 
       const krs = (obj.key_results as {

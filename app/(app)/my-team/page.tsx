@@ -46,7 +46,7 @@ export default async function MyTeamPage({
     .from('team_objectives')
     .select(`
       id, title, aligned_to, created_at,
-      aligned_objective:company_objectives(id, title),
+      aligned_objective:area_objectives(id, title),
       key_results:team_key_results(
         id, description, target_value, current_value, unit,
         updates:team_kr_updates(
@@ -60,10 +60,11 @@ export default async function MyTeamPage({
     .eq('year', year)
     .order('created_at')
 
-  // Fetch company objectives for context
+  // Fetch Operations area objectives for alignment options
   const { data: companyObjectives } = await supabase
-    .from('company_objectives')
+    .from('area_objectives')
     .select('id, title')
+    .eq('area_id', operationsArea.id)
     .eq('quarter', quarter)
     .eq('year', year)
 
