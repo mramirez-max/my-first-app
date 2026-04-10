@@ -94,7 +94,7 @@ export default function ObjectiveDialog({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-[720px] w-full bg-[#1c1540] border-white/10 px-8 py-7">
+      <DialogContent className="sm:max-w-[720px] w-full bg-[#1c1540] border-white/10 px-8 py-7">
         <DialogHeader className="mb-6">
           <DialogTitle className="text-white text-xl">{existing ? 'Edit Objective' : 'Add Objective'}</DialogTitle>
           {(type === 'area' || type === 'team') && !existing && (
