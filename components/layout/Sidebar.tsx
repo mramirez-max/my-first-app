@@ -16,6 +16,7 @@ import {
   ChevronRight,
   BarChart3,
   TrendingUp,
+  Users,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -102,9 +103,18 @@ export default function Sidebar({ profile, areas }: SidebarProps) {
           </div>
         </div>
 
+        {/* My Team — visible to Operations members and admins */}
+        {(profile?.role === 'admin' || profile?.area?.name === 'Operations') && (
+          <div className="pt-4 space-y-0.5">
+            <NavItem href="/my-team" icon={<Users size={16} />} active={pathname === '/my-team'}>
+              My Team
+            </NavItem>
+          </div>
+        )}
+
         {/* Admin */}
         {profile?.role === 'admin' && (
-          <div className="pt-4 space-y-0.5">
+          <div className="pt-1 space-y-0.5">
             <NavItem href="/executive" icon={<BarChart3 size={16} />} active={pathname === '/executive'}>
               Executive View
             </NavItem>
