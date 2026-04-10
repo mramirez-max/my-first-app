@@ -396,14 +396,14 @@ export default function MyTeamClient({ objectives, companyObjectives, quarter, y
         />
       </div>
 
-      {/* Report section */}
-      <div className="rounded-xl border border-white/8 bg-gradient-to-br from-[#1c1540] to-[#23174B] overflow-hidden">
+      {/* Report section — screen */}
+      <div className="rounded-xl border border-white/8 bg-gradient-to-br from-[#1c1540] to-[#23174B] overflow-hidden print:hidden">
         <div className="px-5 py-4 border-b border-white/8 flex items-center justify-between gap-4">
           <div>
             <h3 className="text-base font-semibold text-white">Weekly Report</h3>
             <p className="text-xs text-white/40 mt-0.5">AI-generated summary of this week's Operations progress</p>
           </div>
-          <div className="flex items-center gap-2 print:hidden">
+          <div className="flex items-center gap-2">
             {report && (
               <button
                 onClick={() => window.print()}
@@ -423,18 +423,14 @@ export default function MyTeamClient({ objectives, companyObjectives, quarter, y
             </button>
           </div>
         </div>
-
         <div className="px-5 py-4">
-          {error && (
-            <p className="text-sm text-red-400">{error}</p>
-          )}
+          {error && <p className="text-sm text-red-400">{error}</p>}
           {!report && !error && !generating && (
             <p className="text-sm text-white/35 italic">Click &ldquo;Generate Report&rdquo; to create your weekly status summary.</p>
           )}
           {generating && (
             <div className="flex items-center gap-2 text-sm text-white/40">
-              <Loader2 size={14} className="animate-spin" />
-              Analyzing Operations OKRs…
+              <Loader2 size={14} className="animate-spin" /> Analyzing Operations OKRs…
             </div>
           )}
           {report && (
@@ -442,6 +438,156 @@ export default function MyTeamClient({ objectives, companyObjectives, quarter, y
               <ReactMarkdown components={MD_COMPONENTS}>{report}</ReactMarkdown>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* ── PRINT-ONLY PDF LAYOUT ── */}
+      {report && <PrintReport objectives={objectives} report={report} quarter={quarter} year={year} currentWeek={currentWeek} />}
+    </div>
+  )
+}
+
+/* ── Print-only branded PDF component ── */
+function PrintReport({
+  objectives,
+  report,
+  quarter,
+  year,
+  currentWeek,
+}: {
+  objectives: AreaObjective[]
+  report: string
+  quarter: number
+  year: number
+  currentWeek: string
+}) {
+  const weekLabel = (() => {
+    const d = new Date(currentWeek + 'T00:00:00')
+    return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+  })()
+
+  const CONF_LABEL: Record<number, string> = { 1: 'Off track', 2: 'At risk', 3: 'Cautious', 4: 'Good', 5: 'On track' }
+
+  return (
+    <div className="hidden print:block okr-print-report" style={{ fontFamily: 'system-ui, sans-serif', color: '#111', background: 'white' }}>
+
+      {/* Header */}
+      <div style={{ background: 'linear-gradient(135deg, #FF5A70, #4A268C)', padding: '20px 32px', marginBottom: '28px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ color: 'white', fontSize: '20px', fontWeight: 700, letterSpacing: '-0.3px' }}>
+              Operations — Weekly OKR Report
+            </div>
+            <div style={{ color: 'rgba(255,255,255,0.75)', fontSize: '13px', marginTop: '4px' }}>
+              Q{quarter} {year} · Week of {weekLabel}
+            </div>
+          </div>
+          <img src="/logo-ontop.png" alt="Ontop" style={{ height: '28px', filter: 'brightness(0) invert(1)' }} />
+        </div>
+      </div>
+
+      <div style={{ padding: '0 32px 32px' }}>
+
+        {/* OKR Progress Table — one per objective */}
+        {objectives.map(obj => {
+          const krs = (obj.key_results ?? []) as KeyResult[]
+          const alignedTitle = (obj.aligned_objective as { title?: string } | null)?.title
+
+          return (
+            <div key={obj.id} style={{ marginBottom: '28px' }}>
+              {/* Objective heading */}
+              <div style={{ marginBottom: '8px' }}>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: '#291960', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Objective
+                </div>
+                <div style={{ fontSize: '15px', fontWeight: 600, color: '#111', marginTop: '2px' }}>{obj.title}</div>
+                {alignedTitle && (
+                  <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>
+                    Contributes to: {alignedTitle}
+                  </div>
+                )}
+              </div>
+
+              {/* Table */}
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                <thead>
+                  <tr style={{ background: '#291960' }}>
+                    {['Key Result', 'Target', 'Current', 'Progress', 'Confidence', 'Latest Update'].map(h => (
+                      <th key={h} style={{ padding: '8px 10px', color: 'white', fontWeight: 600, textAlign: 'left', whiteSpace: 'nowrap' }}>
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {krs.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} style={{ padding: '10px', color: '#888', fontStyle: 'italic', borderBottom: '1px solid #eee' }}>
+                        No key results defined.
+                      </td>
+                    </tr>
+                  ) : krs.map((kr, i) => {
+                    const sorted = [...(kr.updates ?? [])].sort(
+                      (a, b) => new Date(b.week_date).getTime() - new Date(a.week_date).getTime()
+                    )
+                    const latest = sorted[0] ?? null
+                    const progress = calcProgress(kr.current_value, kr.target_value)
+                    const unit = kr.unit ? ` ${kr.unit}` : ''
+                    const hasUpdateThisWeek = sorted.some(u => u.week_date === currentWeek)
+                    const confScore = latest?.confidence_score ?? null
+                    const confColor = confScore == null ? '#888' : confScore >= 4 ? '#16a34a' : confScore === 3 ? '#ca8a04' : '#dc2626'
+                    const updateText = latest?.update_text
+                      ? latest.update_text.length > 80 ? latest.update_text.slice(0, 80) + '…' : latest.update_text
+                      : hasUpdateThisWeek ? '—' : 'No update this week'
+
+                    return (
+                      <tr key={kr.id} style={{ background: i % 2 === 0 ? '#fafafa' : 'white', borderBottom: '1px solid #eee' }}>
+                        <td style={{ padding: '8px 10px', color: '#111', maxWidth: '180px' }}>{kr.description}</td>
+                        <td style={{ padding: '8px 10px', color: '#444', whiteSpace: 'nowrap' }}>{kr.target_value}{unit}</td>
+                        <td style={{ padding: '8px 10px', color: '#444', whiteSpace: 'nowrap' }}>{kr.current_value}{unit}</td>
+                        <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>
+                          <span style={{ fontWeight: 600, color: progress >= 80 ? '#16a34a' : progress >= 50 ? '#ca8a04' : '#dc2626' }}>
+                            {progress}%
+                          </span>
+                        </td>
+                        <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>
+                          {confScore !== null ? (
+                            <span style={{ color: confColor, fontWeight: 600 }}>
+                              {confScore}/5 · {CONF_LABEL[confScore]}
+                            </span>
+                          ) : (
+                            <span style={{ color: '#888' }}>—</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '8px 10px', color: '#555', fontStyle: latest?.update_text ? 'normal' : 'italic' }}>
+                          {updateText}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )
+        })}
+
+        {/* Divider */}
+        <div style={{ borderTop: '2px solid #FF5A70', margin: '24px 0 20px' }} />
+
+        {/* AI Summary */}
+        <div>
+          <div style={{ fontSize: '13px', fontWeight: 700, color: '#291960', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>
+            AI Summary
+          </div>
+          <div style={{ fontSize: '12px', lineHeight: '1.7', color: '#333', whiteSpace: 'pre-wrap' }}>
+            {report.replace(/##\s*/g, '\n').replace(/\*\*/g, '')}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{ marginTop: '32px', paddingTop: '12px', borderTop: '1px solid #eee', fontSize: '11px', color: '#aaa', display: 'flex', justifyContent: 'space-between' }}>
+          <span>Generated by Ontop AI Chief of Staff</span>
+          <span>{new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
         </div>
       </div>
     </div>

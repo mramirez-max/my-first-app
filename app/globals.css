@@ -133,29 +133,28 @@
 
 /* Print styles — used by My Team weekly report PDF export */
 @media print {
-  nav, aside, [data-sidebar], .print\:hidden { display: none !important; }
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 
-  * {
-    background: white !important;
-    color: #111 !important;
-    border-color: #ddd !important;
-    box-shadow: none !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
+  /* Hide everything except the branded print report */
+  body > * { display: none !important; }
+  body .okr-print-report,
+  body .okr-print-report * { display: revert !important; }
 
   body {
     background: white !important;
-    color: #111 !important;
+    margin: 0;
+    padding: 0;
   }
 
-  .print\:p-0 { padding: 0 !important; }
-  .print\:max-w-none { max-width: none !important; }
+  .okr-print-report {
+    display: block !important;
+    background: white;
+    color: #111;
+  }
 
-  /* Report markdown text */
-  p, li, h2, h3, strong { color: #111 !important; }
-  h2 { font-size: 1.1rem; font-weight: 700; margin-top: 1.2rem; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
-  h3 { font-size: 1rem; font-weight: 600; margin-top: 0.8rem; }
+  /* Force table colors to print */
+  thead tr { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
 
 /* Ontop glow utility */
