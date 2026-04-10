@@ -2,10 +2,11 @@
 
 import { useState, useMemo } from 'react'
 import { calcProgress, Profile, AreaObjective, CompanyObjective } from '@/types'
-import { Loader2, FileDown, TrendingUp, TrendingDown, Minus, AlertCircle, Clock, PlusCircle } from 'lucide-react'
+import { Loader2, FileDown, TrendingUp, TrendingDown, Minus, AlertCircle, Clock, PlusCircle, Sparkles } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import OKRCard from '@/components/okr/OKRCard'
 import ObjectiveDialog from '@/components/okr/ObjectiveDialog'
+import AISetupModal from '@/components/okr/AISetupModal'
 import { useRouter } from 'next/navigation'
 
 interface KRUpdate {
@@ -227,6 +228,7 @@ export default function MyTeamClient({ objectives, companyObjectives, quarter, y
   const [report, setReport] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [showObjectiveDialog, setShowObjectiveDialog] = useState(false)
+  const [showAISetup, setShowAISetup] = useState(false)
   const router = useRouter()
 
   const weeks = useMemo(() => getLastNWeeks(6), [])
@@ -281,13 +283,22 @@ export default function MyTeamClient({ objectives, companyObjectives, quarter, y
               : `${objectives.length} objective${objectives.length !== 1 ? 's' : ''} · Q${quarter} ${year}`}
           </p>
           {canEdit && (
-            <button
-              onClick={() => setShowObjectiveDialog(true)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-gradient-to-br from-[#FF5A70] to-[#4A268C] text-white hover:opacity-90 transition-opacity"
-            >
-              <PlusCircle size={14} />
-              Add Objective
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowAISetup(true)}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-gradient-to-br from-[#FF5A70] to-[#4A268C] text-white hover:opacity-90 transition-opacity"
+              >
+                <Sparkles size={14} />
+                Generate with AI
+              </button>
+              <button
+                onClick={() => setShowObjectiveDialog(true)}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium border border-white/15 text-white/60 hover:text-white hover:bg-white/5 transition-colors"
+              >
+                <PlusCircle size={14} />
+                Add Objective
+              </button>
+            </div>
           )}
         </div>
 
@@ -325,6 +336,18 @@ export default function MyTeamClient({ objectives, companyObjectives, quarter, y
           companyObjectives={companyObjectives as import('@/types').CompanyObjective[]}
           onSuccess={handleRefresh}
         />
+
+        <AISetupModal
+          open={showAISetup}
+          onClose={() => setShowAISetup(false)}
+          type="team"
+          areaId={operationsAreaId}
+          areaName="Operations"
+          companyObjectives={companyObjectives as Pick<CompanyObjective, 'id' | 'title'>[]}
+          quarter={quarter}
+          year={year}
+          onSuccess={handleRefresh}
+        />
       </div>
     )
   }
@@ -351,13 +374,22 @@ export default function MyTeamClient({ objectives, companyObjectives, quarter, y
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold text-white/60 uppercase tracking-wide">Team OKRs</h3>
-          <button
-            onClick={() => setShowObjectiveDialog(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-white/15 text-white/50 hover:text-white hover:bg-white/5 transition-colors print:hidden"
-          >
-            <PlusCircle size={12} />
-            Add Objective
-          </button>
+          <div className="flex items-center gap-2 print:hidden">
+            <button
+              onClick={() => setShowAISetup(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-gradient-to-br from-[#FF5A70] to-[#4A268C] text-white hover:opacity-90 transition-opacity"
+            >
+              <Sparkles size={12} />
+              Generate with AI
+            </button>
+            <button
+              onClick={() => setShowObjectiveDialog(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-white/15 text-white/50 hover:text-white hover:bg-white/5 transition-colors"
+            >
+              <PlusCircle size={12} />
+              Add Objective
+            </button>
+          </div>
         </div>
 
         {objectives.length === 0 ? (
@@ -392,6 +424,18 @@ export default function MyTeamClient({ objectives, companyObjectives, quarter, y
           type="team"
           areaId={operationsAreaId}
           companyObjectives={companyObjectives as import('@/types').CompanyObjective[]}
+          onSuccess={handleRefresh}
+        />
+
+        <AISetupModal
+          open={showAISetup}
+          onClose={() => setShowAISetup(false)}
+          type="team"
+          areaId={operationsAreaId}
+          areaName="Operations"
+          companyObjectives={companyObjectives as Pick<CompanyObjective, 'id' | 'title'>[]}
+          quarter={quarter}
+          year={year}
           onSuccess={handleRefresh}
         />
       </div>

@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils'
 interface AISetupModalProps {
   open: boolean
   onClose: () => void
+  type?: 'area' | 'team'
   areaId: string
   areaName: string
   companyObjectives: Pick<CompanyObjective, 'id' | 'title'>[]
@@ -34,6 +35,7 @@ type Step = 'prompt' | 'generating' | 'preview' | 'saving'
 export default function AISetupModal({
   open,
   onClose,
+  type = 'area',
   areaId,
   areaName,
   companyObjectives,
@@ -82,11 +84,14 @@ export default function AISetupModal({
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setError('Not authenticated'); setStep('preview'); return }
 
+    const objTable = type === 'team' ? 'team_objectives' : 'area_objectives'
+    const krTable = type === 'team' ? 'team_key_results' : 'area_key_results'
+
     try {
       for (const obj of objectives) {
         // Insert objective
         const { data: newObj, error: objErr } = await supabase
-          .from('area_objectives')
+          .from(objTable)
           .insert({
             area_id: areaId,
             title: obj.title,
@@ -102,7 +107,7 @@ export default function AISetupModal({
 
         // Insert key results
         for (const kr of obj.key_results) {
-          const { error: krErr } = await supabase.from('area_key_results').insert({
+          const { error: krErr } = await supabase.from(krTable).insert({
             objective_id: newObj.id,
             description: kr.description,
             target_value: kr.target_value,
@@ -180,7 +185,7 @@ export default function AISetupModal({
             {/* Company objectives hint */}
             {companyObjectives.length > 0 && (
               <div className="text-xs text-white/50 bg-white/5 rounded-lg p-3 space-y-1">
-                <p className="font-medium text-white/70 mb-1">Company objectives this quarter:</p>
+                <p className="font-medium text-white/70 mb-1">{type === 'team' ? 'Area objectives this quarter:' : 'Company objectives this quarter:'}</p>
                 {companyObjectives.map((co, i) => (
                   <div key={co.id} className="flex items-start gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-[#FF5A70] mt-1.5 shrink-0" />
@@ -272,7 +277,7 @@ export default function AISetupModal({
                   {/* Company alignment */}
                   <div className="space-y-1.5">
                     <p className="text-xs text-white/40 flex items-center gap-1">
-                      <Link2 size={11} /> Aligned to company objective
+                      <Link2 size={11} /> Aligned to {type === 'team' ? 'area' : 'company'} objective
                     </p>
                     <div className="space-y-1.5">
                       {companyObjectives.map(co => {
