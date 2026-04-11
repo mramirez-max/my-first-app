@@ -35,7 +35,8 @@ interface MyTeamClientProps {
   year: number
   isAdmin: boolean
   profile: Profile
-  operationsAreaId: string
+  areaId: string
+  areaName: string
 }
 
 const CONFIDENCE_COLORS: Record<number, string> = {
@@ -223,7 +224,7 @@ function KRCard({ kr, weeks, currentWeek }: { kr: KeyResult; weeks: string[]; cu
   )
 }
 
-export default function MyTeamClient({ objectives, companyObjectives, quarter, year, isAdmin, profile, operationsAreaId }: MyTeamClientProps) {
+export default function MyTeamClient({ objectives, companyObjectives, quarter, year, isAdmin, profile, areaId, areaName }: MyTeamClientProps) {
   const [generating, setGenerating] = useState(false)
   const [report, setReport] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -260,7 +261,7 @@ export default function MyTeamClient({ objectives, companyObjectives, quarter, y
       const res = await fetch('/api/okrs/weekly-report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ quarter, year }),
+        body: JSON.stringify({ quarter, year, areaId, areaName }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Failed to generate report')
@@ -332,7 +333,7 @@ export default function MyTeamClient({ objectives, companyObjectives, quarter, y
           open={showObjectiveDialog}
           onClose={() => setShowObjectiveDialog(false)}
           type="team"
-          areaId={operationsAreaId}
+          areaId={areaId}
           companyObjectives={companyObjectives as import('@/types').CompanyObjective[]}
           onSuccess={handleRefresh}
         />
@@ -341,8 +342,8 @@ export default function MyTeamClient({ objectives, companyObjectives, quarter, y
           open={showAISetup}
           onClose={() => setShowAISetup(false)}
           type="team"
-          areaId={operationsAreaId}
-          areaName="Operations"
+          areaId={areaId}
+          areaName={areaName}
           companyObjectives={companyObjectives as Pick<CompanyObjective, 'id' | 'title'>[]}
           quarter={quarter}
           year={year}
@@ -395,7 +396,7 @@ export default function MyTeamClient({ objectives, companyObjectives, quarter, y
         {objectives.length === 0 ? (
           <div className="rounded-xl border border-white/8 bg-gradient-to-br from-[#1c1540] to-[#23174B] p-8 text-center space-y-3">
             <Clock size={32} className="text-white/20 mx-auto" />
-            <p className="text-white/50 text-sm">No OKRs set for Operations in Q{quarter} {year}.</p>
+            <p className="text-white/50 text-sm">No OKRs set for {areaName} in Q{quarter} {year}.</p>
             <button
               onClick={() => setShowObjectiveDialog(true)}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-br from-[#FF5A70] to-[#4A268C] text-white hover:opacity-90 transition-opacity"
@@ -422,7 +423,7 @@ export default function MyTeamClient({ objectives, companyObjectives, quarter, y
           open={showObjectiveDialog}
           onClose={() => setShowObjectiveDialog(false)}
           type="team"
-          areaId={operationsAreaId}
+          areaId={areaId}
           companyObjectives={companyObjectives as import('@/types').CompanyObjective[]}
           onSuccess={handleRefresh}
         />
@@ -431,8 +432,8 @@ export default function MyTeamClient({ objectives, companyObjectives, quarter, y
           open={showAISetup}
           onClose={() => setShowAISetup(false)}
           type="team"
-          areaId={operationsAreaId}
-          areaName="Operations"
+          areaId={areaId}
+          areaName={areaName}
           companyObjectives={companyObjectives as Pick<CompanyObjective, 'id' | 'title'>[]}
           quarter={quarter}
           year={year}
@@ -445,7 +446,7 @@ export default function MyTeamClient({ objectives, companyObjectives, quarter, y
         <div className="px-5 py-4 border-b border-white/8 flex items-center justify-between gap-4">
           <div>
             <h3 className="text-base font-semibold text-white">Weekly Report</h3>
-            <p className="text-xs text-white/40 mt-0.5">AI-generated summary of this week's Operations progress</p>
+            <p className="text-xs text-white/40 mt-0.5">AI-generated summary of this week's {areaName} progress</p>
           </div>
           <div className="flex items-center gap-2">
             {report && (
@@ -486,7 +487,7 @@ export default function MyTeamClient({ objectives, companyObjectives, quarter, y
       </div>
 
       {/* ── PRINT-ONLY PDF LAYOUT ── */}
-      {report && <PrintReport objectives={objectives} report={report} quarter={quarter} year={year} currentWeek={currentWeek} />}
+      {report && <PrintReport objectives={objectives} report={report} quarter={quarter} year={year} currentWeek={currentWeek} areaName={areaName} />}
     </div>
   )
 }
@@ -498,12 +499,14 @@ function PrintReport({
   quarter,
   year,
   currentWeek,
+  areaName,
 }: {
   objectives: AreaObjective[]
   report: string
   quarter: number
   year: number
   currentWeek: string
+  areaName: string
 }) {
   const weekLabel = (() => {
     const d = new Date(currentWeek + 'T00:00:00')
@@ -520,7 +523,7 @@ function PrintReport({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <div style={{ color: 'white', fontSize: '20px', fontWeight: 700, letterSpacing: '-0.3px' }}>
-              Operations — Weekly OKR Report
+              {areaName} — Weekly OKR Report
             </div>
             <div style={{ color: 'rgba(255,255,255,0.75)', fontSize: '13px', marginTop: '4px' }}>
               Q{quarter} {year} · Week of {weekLabel}

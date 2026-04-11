@@ -15,24 +15,19 @@ export async function POST(req: NextRequest) {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, area_id')
       .eq('id', user.id)
       .single()
-    if (profile?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-    const { quarter, year } = await req.json()
-    if (!quarter || !year) return NextResponse.json({ error: 'quarter and year are required' }, { status: 400 })
+    const { quarter, year, areaId, areaName } = await req.json()
+    if (!quarter || !year || !areaId) return NextResponse.json({ error: 'quarter, year and areaId are required' }, { status: 400 })
 
-    // Find Operations area
-    const { data: operationsArea } = await supabase
-      .from('areas')
-      .select('id')
-      .eq('name', 'Operations')
-      .single()
+    // Allow admins or area members
+    const isAdmin = profile?.role === 'admin'
+    const isAreaMember = profile?.area_id === areaId
+    if (!isAdmin && !isAreaMember) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-    if (!operationsArea) return NextResponse.json({ error: 'Operations area not found' }, { status: 404 })
-
-    // Fetch team OKRs with all updates for the quarter (independent from area_objectives)
+    // Fetch team OKRs with all updates for the quarter
     const { data: objectives, error: dbError } = await supabase
       .from('team_objectives')
       .select(`
@@ -43,7 +38,7 @@ export async function POST(req: NextRequest) {
           updates:team_kr_updates(confidence_score, update_text, week_date, created_at)
         )
       `)
-      .eq('area_id', operationsArea.id)
+      .eq('area_id', areaId)
       .eq('quarter', quarter)
       .eq('year', year)
       .order('created_at')
@@ -109,16 +104,18 @@ export async function POST(req: NextRequest) {
       return `${header}\n${krs}`
     }).join('\n\n---\n\n')
 
-    const prompt = `You are helping Cami, COO of Ontop, track her Operations team's weekly OKR progress.
+    const displayAreaName = areaName ?? 'the team'
+    const prompt = `You are helping an area lead at Ontop track their ${displayAreaName} team's weekly OKR progress.
 
 Today is ${today.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.
 Quarter: Q${quarter} ${year}
+Area: ${displayAreaName}
 
-Here is the Operations team's OKR data:
+Here is the ${displayAreaName} team's OKR data:
 
 ${objSummaries || 'No OKRs set for this quarter.'}
 
-Write a concise weekly status report for Cami. Cover exactly these five sections:
+Write a concise weekly status report. Cover exactly these five sections:
 
 ## Team Health
 Quick summary: how many KRs are on track (confidence 4-5), cautious (3), at risk (1-2), and missing updates this week.
@@ -130,9 +127,9 @@ Wins or improvements this week — KRs that gained confidence or hit milestones.
 KRs that are declining, stalled, or at risk (confidence ≤ 2). Name them and include the latest update context.
 
 ## Missing Updates
-List KRs with no update submitted this week. These are gaps Cami should follow up on.
+List KRs with no update submitted this week. These are gaps the area lead should follow up on.
 
-## Actions for Cami
+## Actions
 2–3 specific, actionable next steps based on what you see. Name the KRs. Not generic advice.
 
 Be direct. No preamble. No sign-off. No padding.`
