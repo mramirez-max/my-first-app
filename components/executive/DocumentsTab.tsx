@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Upload, Loader2, FileText, Trash2, ExternalLink, Check, X, ChevronDown, Pencil } from 'lucide-react'
+import { Upload, Loader2, FileText, Trash2, ExternalLink, Check, X, ChevronDown, Pencil, ClipboardPaste } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
@@ -17,6 +17,7 @@ export interface CompanyDocument {
 }
 
 const DOC_TYPES = [
+  { value: 'meeting_notes',     label: 'Meeting Notes' },
   { value: 'board_deck',        label: 'Board Deck' },
   { value: 'investor_update',   label: 'Investor Update' },
   { value: 'investor_deck',     label: 'Investor Deck' },
@@ -35,6 +36,7 @@ interface Props {
 }
 
 type Step = 'idle' | 'uploading' | 'extracting' | 'review' | 'saving'
+type InputMode = 'pdf' | 'paste'
 
 interface DraftDoc {
   title:    string
@@ -52,6 +54,7 @@ export default function DocumentsTab({ isAdmin, initialDocs }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState<Partial<DraftDoc>>({})
   const [deleting, setDeleting]   = useState<string | null>(null)
+  const [inputMode, setInputMode] = useState<InputMode>('pdf')
   const fileRef                   = useRef<HTMLInputElement>(null)
 
   // Form fields for new upload
@@ -60,10 +63,49 @@ export default function DocumentsTab({ isAdmin, initialDocs }: Props) {
   const [newDate,    setNewDate]    = useState('')
   const [newFile,    setNewFile]    = useState<File | null>(null)
 
+  // Paste mode fields
+  const [pasteTitle,   setPasteTitle]   = useState('')
+  const [pasteType,    setPasteType]    = useState('meeting_notes')
+  const [pasteDate,    setPasteDate]    = useState('')
+  const [pasteContent, setPasteContent] = useState('')
+  const [pasteSaving,  setPasteSaving]  = useState(false)
+
   function resetForm() {
     setNewTitle(''); setNewType('board_deck'); setNewDate(''); setNewFile(null)
     setDraft(null); setStep('idle'); setError(null)
     if (fileRef.current) fileRef.current.value = ''
+  }
+
+  function resetPasteForm() {
+    setPasteTitle(''); setPasteType('meeting_notes'); setPasteDate(''); setPasteContent('')
+    setError(null)
+  }
+
+  async function handlePasteSave() {
+    if (!pasteTitle.trim() || !pasteContent.trim()) return
+    setPasteSaving(true)
+    setError(null)
+    const res = await fetch('/api/documents', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: pasteTitle,
+        doc_type: pasteType,
+        doc_date: pasteDate || null,
+        blob_url: null,
+        summary: pasteContent,
+      }),
+    })
+    if (!res.ok) {
+      const j = await res.json()
+      setError(j.error ?? 'Save failed')
+      setPasteSaving(false)
+      return
+    }
+    const { data } = await res.json()
+    setDocs(prev => [data, ...prev])
+    resetPasteForm()
+    setPasteSaving(false)
   }
 
   async function handleUpload() {
@@ -159,67 +201,151 @@ export default function DocumentsTab({ isAdmin, initialDocs }: Props) {
   return (
     <div className="space-y-6">
 
-      {/* Upload form — admin only */}
+      {/* Add document — admin only */}
       {isAdmin && step !== 'review' && (
         <div className="rounded-xl border border-white/8 bg-white/3 p-5 space-y-4">
-          <h3 className="text-sm font-semibold text-white">Add Document</h3>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {/* Title */}
-            <input
-              type="text"
-              placeholder="Document title"
-              value={newTitle}
-              onChange={e => setNewTitle(e.target.value)}
-              disabled={step !== 'idle'}
-              className="sm:col-span-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-white/25 disabled:opacity-50"
-            />
-            {/* Type */}
-            <div className="relative">
-              <select
-                value={newType}
-                onChange={e => setNewType(e.target.value)}
-                disabled={step !== 'idle'}
-                className="w-full appearance-none bg-white/5 border border-white/10 rounded-lg px-3 py-2 pr-8 text-sm text-white focus:outline-none focus:border-white/25 disabled:opacity-50"
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-white">Add Document</h3>
+            {/* Mode toggle */}
+            <div className="flex items-center gap-1 bg-white/5 rounded-lg p-1">
+              <button
+                onClick={() => setInputMode('pdf')}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
+                  inputMode === 'pdf'
+                    ? 'bg-[#FF5A70]/20 text-[#FF5A70]'
+                    : 'text-white/40 hover:text-white/70'
+                )}
               >
-                {DOC_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-              </select>
-              <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
+                <Upload size={12} /> Upload PDF
+              </button>
+              <button
+                onClick={() => setInputMode('paste')}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
+                  inputMode === 'paste'
+                    ? 'bg-[#FF5A70]/20 text-[#FF5A70]'
+                    : 'text-white/40 hover:text-white/70'
+                )}
+              >
+                <ClipboardPaste size={12} /> Paste Notes
+              </button>
             </div>
-            {/* Date */}
-            <input
-              type="date"
-              value={newDate}
-              onChange={e => setNewDate(e.target.value)}
-              disabled={step !== 'idle'}
-              className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white/70 focus:outline-none focus:border-white/25 disabled:opacity-50 [color-scheme:dark]"
-            />
           </div>
 
-          {/* File picker */}
-          <div className="flex items-center gap-3">
-            <input ref={fileRef} type="file" accept=".pdf" className="hidden"
-              onChange={e => setNewFile(e.target.files?.[0] ?? null)} />
-            <button
-              onClick={() => fileRef.current?.click()}
-              disabled={step !== 'idle'}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-white/15 text-sm text-white/40 hover:text-white/70 hover:border-white/30 transition-colors disabled:opacity-50"
-            >
-              <Upload size={13} />
-              {newFile ? newFile.name : 'Choose PDF (max 20 MB)'}
-            </button>
+          {/* PDF upload mode */}
+          {inputMode === 'pdf' && (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <input
+                  type="text"
+                  placeholder="Document title"
+                  value={newTitle}
+                  onChange={e => setNewTitle(e.target.value)}
+                  disabled={step !== 'idle'}
+                  className="sm:col-span-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-white/25 disabled:opacity-50"
+                />
+                <div className="relative">
+                  <select
+                    value={newType}
+                    onChange={e => setNewType(e.target.value)}
+                    disabled={step !== 'idle'}
+                    className="w-full appearance-none bg-white/5 border border-white/10 rounded-lg px-3 py-2 pr-8 text-sm text-white focus:outline-none focus:border-white/25 disabled:opacity-50"
+                  >
+                    {DOC_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  </select>
+                  <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
+                </div>
+                <input
+                  type="date"
+                  value={newDate}
+                  onChange={e => setNewDate(e.target.value)}
+                  disabled={step !== 'idle'}
+                  className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white/70 focus:outline-none focus:border-white/25 disabled:opacity-50 [color-scheme:dark]"
+                />
+              </div>
+              <div className="flex items-center gap-3">
+                <input ref={fileRef} type="file" accept=".pdf" className="hidden"
+                  onChange={e => setNewFile(e.target.files?.[0] ?? null)} />
+                <button
+                  onClick={() => fileRef.current?.click()}
+                  disabled={step !== 'idle'}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-white/15 text-sm text-white/40 hover:text-white/70 hover:border-white/30 transition-colors disabled:opacity-50"
+                >
+                  <Upload size={13} />
+                  {newFile ? newFile.name : 'Choose PDF (max 20 MB)'}
+                </button>
+                <Button
+                  size="sm"
+                  onClick={handleUpload}
+                  disabled={!canUpload}
+                  className="gap-2 bg-gradient-to-r from-[#FF5A70] to-[#4A268C] text-white border-0 hover:opacity-90 disabled:opacity-30"
+                >
+                  {step === 'uploading'  && <><Loader2 size={13} className="animate-spin" /> Uploading to storage…</>}
+                  {step === 'extracting' && <><Loader2 size={13} className="animate-spin" /> AI is reading PDF (up to 60s)…</>}
+                  {step === 'idle'       && <><FileText size={13} /> Upload & Extract</>}
+                </Button>
+              </div>
+            </>
+          )}
 
-            <Button
-              size="sm"
-              onClick={handleUpload}
-              disabled={!canUpload}
-              className="gap-2 bg-gradient-to-r from-[#FF5A70] to-[#4A268C] text-white border-0 hover:opacity-90 disabled:opacity-30"
-            >
-              {step === 'uploading'  && <><Loader2 size={13} className="animate-spin" /> Uploading to storage…</>}
-              {step === 'extracting' && <><Loader2 size={13} className="animate-spin" /> AI is reading PDF (up to 60s)…</>}
-              {step === 'idle'       && <><FileText size={13} /> Upload & Extract</>}
-            </Button>
-          </div>
+          {/* Paste notes mode */}
+          {inputMode === 'paste' && (
+            <>
+              <p className="text-xs text-white/40">
+                Paste your Notion meeting notes, OKR call transcript, or any text. It will be saved as-is and used as context by the AI Chief of Staff.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <input
+                  type="text"
+                  placeholder="e.g. Q2 OKR Planning Call — Apr 11"
+                  value={pasteTitle}
+                  onChange={e => setPasteTitle(e.target.value)}
+                  className="sm:col-span-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-white/25"
+                />
+                <div className="relative">
+                  <select
+                    value={pasteType}
+                    onChange={e => setPasteType(e.target.value)}
+                    className="w-full appearance-none bg-white/5 border border-white/10 rounded-lg px-3 py-2 pr-8 text-sm text-white focus:outline-none focus:border-white/25"
+                  >
+                    {DOC_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  </select>
+                  <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
+                </div>
+                <input
+                  type="date"
+                  value={pasteDate}
+                  onChange={e => setPasteDate(e.target.value)}
+                  className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white/70 focus:outline-none focus:border-white/25 [color-scheme:dark]"
+                />
+              </div>
+              <textarea
+                placeholder="Paste your meeting notes or transcript here..."
+                value={pasteContent}
+                onChange={e => setPasteContent(e.target.value)}
+                rows={12}
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-sm text-white/85 placeholder:text-white/25 leading-relaxed focus:outline-none focus:border-white/25 resize-y"
+              />
+              <div className="flex items-center gap-3">
+                <Button
+                  size="sm"
+                  onClick={handlePasteSave}
+                  disabled={!pasteTitle.trim() || !pasteContent.trim() || pasteSaving}
+                  className="gap-2 bg-gradient-to-r from-[#FF5A70] to-[#4A268C] text-white border-0 hover:opacity-90 disabled:opacity-30"
+                >
+                  {pasteSaving
+                    ? <><Loader2 size={13} className="animate-spin" /> Saving…</>
+                    : <><Check size={13} /> Save Notes</>}
+                </Button>
+                {(pasteTitle || pasteContent) && (
+                  <button onClick={resetPasteForm} className="text-sm text-white/30 hover:text-white/60 transition-colors">
+                    Clear
+                  </button>
+                )}
+              </div>
+            </>
+          )}
 
           {error && <p className="text-xs text-red-400">{error}</p>}
         </div>
