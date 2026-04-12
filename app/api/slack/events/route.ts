@@ -337,7 +337,7 @@ You have access to OKR data, live business metrics, and strategic documents (boa
 DATA HIERARCHY — always follow this when sources conflict:
 1. *Business Metrics* (labeled by month/year) — ground truth for all KPIs. Always use these for specific numbers.
 2. *OKR updates* (labeled by date) — most recent qualitative signals: confidence, blockers, weekly progress.
-3. *Strategic documents* (labeled by date) — strategic context only: priorities, narrative, commitments. Do NOT cite their metrics if Business Metrics has more recent data.
+3. *Strategic documents & meeting notes* (labeled by date) — strategic context, decisions made, OKR call outcomes, priorities, narrative. Do NOT cite their metrics if Business Metrics has more recent data.
 When a metric appears in both a document and Business Metrics, use the Business Metrics value and note the document's figure was from an earlier date if relevant.
 
 Answer the question asked. Nothing more.
@@ -353,7 +353,7 @@ RULES:
 Decision Logs (decisions and checkpoint outcomes — most recent first):
 ${logsSection}
 
-Strategic Documents:
+Strategic Documents & Meeting Notes:
 ${docsSection}
 
 Q${quarter} ${year} OKR DATA:

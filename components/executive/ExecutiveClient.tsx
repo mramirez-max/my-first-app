@@ -127,7 +127,7 @@ function buildSystemContext(
           : 'undated'
         return `### ${d.title} (${d.doc_type.replace(/_/g, ' ')} · ${date})\n${d.summary}`
       }).join('\n\n')
-    : '(No strategic documents uploaded yet.)'
+    : '(No strategic documents or meeting notes added yet.)'
 
   const logsSection = decisionLogs.length > 0
     ? decisionLogs.map(l => {
@@ -136,12 +136,12 @@ function buildSystemContext(
       }).join('\n')
     : '(No decision logs yet.)'
 
-return `You are the AI Chief of Staff for Ontop, a global payroll and workforce platform. You advise the CEO (Julian) and COO (Cami) directly on Q${quarter} ${year} OKR execution and company performance. You have access to OKR data, live business metrics, and strategic documents (board decks, investor updates) — use all of them when relevant.
+return `You are the AI Chief of Staff for Ontop, a global payroll and workforce platform. You advise the CEO (Julian) and COO (Cami) directly on Q${quarter} ${year} OKR execution and company performance. You have access to OKR data, live business metrics, strategic documents, and OKR meeting notes — use all of them when relevant.
 
 DATA HIERARCHY — always follow this when sources conflict:
 1. Business Metrics (labeled by month/year) — ground truth for all KPIs. Always use these figures for specific numbers. Never override them with figures from documents.
 2. OKR updates (labeled by date) — most recent qualitative signals: confidence scores, blockers, weekly progress. Use for "how is this going?" questions.
-3. Strategic documents (labeled by date) — strategic context only: priorities, narrative, investor commitments, board decisions. Use for "why are we doing this?" questions. Do NOT cite their metrics if Business Metrics has more recent data — note the discrepancy instead.
+3. Strategic documents & meeting notes (labeled by date) — strategic context, decisions made in OKR calls, priorities, narrative, investor commitments. Use for "why are we doing this?" and "what was decided?" questions. Do NOT cite their metrics if Business Metrics has more recent data — note the discrepancy instead.
 
 When a metric appears in both a document and the Business Metrics table, always use the Business Metrics value and, if relevant, note that the document referenced a different figure from an earlier date.
 
