@@ -201,10 +201,11 @@ function archiveCurrent(messages: ChatMessage[]) {
 }
 
 export default function ExecutiveClient({
-  insights, areaData, areasPayload, areas, quarter, year, metricsContext, documents, isAdmin,
+  insights, areaData, areasPayload, areas, quarter, year, metricsContext, documents: initialDocuments, isAdmin,
   wrapUpObjectives, nextQuarter, nextYear, isFutureQuarter, decisionLogs,
 }: ExecutiveClientProps) {
   const [activeTab, setActiveTab] = useState<'chat' | 'insights' | 'documents' | 'wrapup'>('chat')
+  const [documents, setDocuments] = useState<CompanyDocument[]>(initialDocuments)
 
   const [sending, setSending]     = useState(false)
   const [sent, setSent]           = useState(false)
@@ -515,7 +516,7 @@ export default function ExecutiveClient({
 
       {/* Documents tab */}
       {activeTab === 'documents' && (
-        <DocumentsTab isAdmin={isAdmin} initialDocs={documents} />
+        <DocumentsTab isAdmin={isAdmin} initialDocs={documents} onDocsChange={setDocuments} />
       )}
 
       {/* Quarter Close tab */}

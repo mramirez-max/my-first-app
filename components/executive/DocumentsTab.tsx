@@ -33,6 +33,7 @@ function docTypeLabel(value: string) {
 interface Props {
   isAdmin: boolean
   initialDocs: CompanyDocument[]
+  onDocsChange?: (docs: CompanyDocument[]) => void
 }
 
 type Step = 'idle' | 'uploading' | 'extracting' | 'review' | 'saving'
@@ -46,8 +47,16 @@ interface DraftDoc {
   summary:  string
 }
 
-export default function DocumentsTab({ isAdmin, initialDocs }: Props) {
+export default function DocumentsTab({ isAdmin, initialDocs, onDocsChange }: Props) {
   const [docs, setDocs]           = useState<CompanyDocument[]>(initialDocs)
+
+  function updateDocs(updater: (prev: CompanyDocument[]) => CompanyDocument[]) {
+    setDocs(prev => {
+      const next = updater(prev)
+      onDocsChange?.(next)
+      return next
+    })
+  }
   const [step, setStep]           = useState<Step>('idle')
   const [error, setError]         = useState<string | null>(null)
   const [draft, setDraft]         = useState<DraftDoc | null>(null)
@@ -103,7 +112,7 @@ export default function DocumentsTab({ isAdmin, initialDocs }: Props) {
       return
     }
     const { data } = await res.json()
-    setDocs(prev => [data, ...prev])
+    updateDocs(prev => [data, ...prev])
     resetPasteForm()
     setPasteSaving(false)
   }
@@ -167,14 +176,14 @@ export default function DocumentsTab({ isAdmin, initialDocs }: Props) {
       setError(j.error ?? 'Save failed'); setStep('review'); return
     }
     const { data } = await res.json()
-    setDocs(prev => [data, ...prev])
+    updateDocs(prev => [data, ...prev])
     resetForm()
   }
 
   async function handleDelete(id: string) {
     setDeleting(id)
     await fetch(`/api/documents?id=${id}`, { method: 'DELETE' })
-    setDocs(prev => prev.filter(d => d.id !== id))
+    updateDocs(prev => prev.filter(d => d.id !== id))
     setDeleting(null)
   }
 
@@ -186,7 +195,7 @@ export default function DocumentsTab({ isAdmin, initialDocs }: Props) {
     })
     if (!res.ok) return
     const { data } = await res.json()
-    setDocs(prev => prev.map(d => d.id === id ? data : d))
+    updateDocs(prev => prev.map(d => d.id === id ? data : d))
     setEditingId(null)
     setEditDraft({})
   }
