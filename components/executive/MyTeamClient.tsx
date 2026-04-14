@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { calcProgress, Profile, AreaObjective, CompanyObjective } from '@/types'
+import { calcProgress, Profile, AreaObjective } from '@/types'
 import { Loader2, FileDown, TrendingUp, TrendingDown, Minus, AlertCircle, Clock, PlusCircle, Sparkles } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import OKRCard from '@/components/okr/OKRCard'
@@ -28,9 +28,15 @@ interface KeyResult {
   updates?: KRUpdate[]
 }
 
+export interface AreaKROption {
+  id: string
+  description: string
+  objectiveTitle: string
+}
+
 interface MyTeamClientProps {
   objectives: AreaObjective[]
-  companyObjectives: CompanyObjective[]
+  areaKRs: AreaKROption[]
   quarter: number
   year: number
   isAdmin: boolean
@@ -224,7 +230,7 @@ function KRCard({ kr, weeks, currentWeek }: { kr: KeyResult; weeks: string[]; cu
   )
 }
 
-export default function MyTeamClient({ objectives, companyObjectives, quarter, year, isAdmin, profile, areaId, areaName }: MyTeamClientProps) {
+export default function MyTeamClient({ objectives, areaKRs, quarter, year, isAdmin, profile, areaId, areaName }: MyTeamClientProps) {
   const [generating, setGenerating] = useState(false)
   const [report, setReport] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -323,10 +329,11 @@ export default function MyTeamClient({ objectives, companyObjectives, quarter, y
             objective={obj as AreaObjective}
             type="team"
             profile={profile}
-            companyObjectives={companyObjectives as import('@/types').CompanyObjective[]}
+            areaKRs={areaKRs}
             onRefresh={handleRefresh}
             isCurrentQuarter={true}
           />
+
         ))}
 
         <ObjectiveDialog
@@ -334,7 +341,7 @@ export default function MyTeamClient({ objectives, companyObjectives, quarter, y
           onClose={() => setShowObjectiveDialog(false)}
           type="team"
           areaId={areaId}
-          companyObjectives={companyObjectives as import('@/types').CompanyObjective[]}
+          areaKRs={areaKRs}
           onSuccess={handleRefresh}
         />
 
@@ -344,7 +351,8 @@ export default function MyTeamClient({ objectives, companyObjectives, quarter, y
           type="team"
           areaId={areaId}
           areaName={areaName}
-          companyObjectives={companyObjectives as Pick<CompanyObjective, 'id' | 'title'>[]}
+          companyObjectives={[]}
+          areaKRs={areaKRs}
           quarter={quarter}
           year={year}
           onSuccess={handleRefresh}
@@ -412,7 +420,7 @@ export default function MyTeamClient({ objectives, companyObjectives, quarter, y
               objective={obj as AreaObjective}
               type="team"
               profile={profile}
-              companyObjectives={companyObjectives as import('@/types').CompanyObjective[]}
+              areaKRs={areaKRs}
               onRefresh={handleRefresh}
               isCurrentQuarter={true}
             />
@@ -424,7 +432,7 @@ export default function MyTeamClient({ objectives, companyObjectives, quarter, y
           onClose={() => setShowObjectiveDialog(false)}
           type="team"
           areaId={areaId}
-          companyObjectives={companyObjectives as import('@/types').CompanyObjective[]}
+          areaKRs={areaKRs}
           onSuccess={handleRefresh}
         />
 
@@ -434,7 +442,8 @@ export default function MyTeamClient({ objectives, companyObjectives, quarter, y
           type="team"
           areaId={areaId}
           areaName={areaName}
-          companyObjectives={companyObjectives as Pick<CompanyObjective, 'id' | 'title'>[]}
+          companyObjectives={[]}
+          areaKRs={areaKRs}
           quarter={quarter}
           year={year}
           onSuccess={handleRefresh}
@@ -538,7 +547,7 @@ function PrintReport({
         {/* OKR Progress Table — one per objective */}
         {objectives.map(obj => {
           const krs = (obj.key_results ?? []) as KeyResult[]
-          const alignedTitle = (obj.aligned_objective as { title?: string } | null)?.title
+          const alignedTitle = (obj.aligned_objective as { description?: string } | null)?.description
 
           return (
             <div key={obj.id} style={{ marginBottom: '28px' }}>

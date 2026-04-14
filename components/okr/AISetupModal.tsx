@@ -13,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { CompanyObjective } from '@/types'
+import { type AreaKROption } from '@/components/executive/MyTeamClient'
 import { createClient } from '@/lib/supabase/client'
 import { ObjectiveProposal, KRProposal } from '@/app/api/ai-okr/route'
 import { Sparkles, Check, AlertCircle, Loader2, Link2, Unlink, PlusCircle, Trash2 } from 'lucide-react'
@@ -25,6 +26,7 @@ interface AISetupModalProps {
   areaId: string
   areaName: string
   companyObjectives: Pick<CompanyObjective, 'id' | 'title'>[]
+  areaKRs?: AreaKROption[]
   quarter: number
   year: number
   onSuccess: () => void
@@ -39,10 +41,15 @@ export default function AISetupModal({
   areaId,
   areaName,
   companyObjectives,
+  areaKRs,
   quarter,
   year,
   onSuccess,
 }: AISetupModalProps) {
+  // For team type, format KRs as alignment options for the AI prompt
+  const alignmentOptions: Pick<CompanyObjective, 'id' | 'title'>[] = type === 'team' && areaKRs?.length
+    ? areaKRs.map(kr => ({ id: kr.id, title: `${kr.objectiveTitle} → ${kr.description}` }))
+    : companyObjectives
   const supabase = createClient()
 
   const [step, setStep] = useState<Step>('prompt')
@@ -64,7 +71,7 @@ export default function AISetupModal({
         body: JSON.stringify({
           prompt: promptText,
           areaName,
-          companyObjectives,
+          companyObjectives: alignmentOptions,
         }),
       })
       const data = await res.json()
@@ -183,10 +190,10 @@ export default function AISetupModal({
         {step === 'prompt' && (
           <div className="space-y-4 mt-2">
             {/* Company objectives hint */}
-            {companyObjectives.length > 0 && (
+            {alignmentOptions.length > 0 && (
               <div className="text-xs text-white/50 bg-white/5 rounded-lg p-3 space-y-1">
-                <p className="font-medium text-white/70 mb-1">{type === 'team' ? 'Area objectives this quarter:' : 'Company objectives this quarter:'}</p>
-                {companyObjectives.map((co, i) => (
+                <p className="font-medium text-white/70 mb-1">{type === 'team' ? 'Area key results this quarter:' : 'Company objectives this quarter:'}</p>
+                {alignmentOptions.map((co, i) => (
                   <div key={co.id} className="flex items-start gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-[#FF5A70] mt-1.5 shrink-0" />
                     <span>{co.title}</span>
@@ -280,7 +287,7 @@ export default function AISetupModal({
                       <Link2 size={11} /> Aligned to {type === 'team' ? 'area' : 'company'} objective
                     </p>
                     <div className="space-y-1.5">
-                      {companyObjectives.map(co => {
+                      {alignmentOptions.map(co => {
                         const selected = obj.aligned_to === co.id
                         return (
                           <button

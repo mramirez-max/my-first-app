@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createClient } from '@/lib/supabase/client'
 import { AreaObjective, CompanyObjective, getCurrentQuarter } from '@/types'
+import { type AreaKROption } from '@/components/executive/MyTeamClient'
 import { CheckCircle2, Circle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -22,6 +23,7 @@ interface ObjectiveDialogProps {
   type: 'area' | 'company' | 'team'
   existing?: AreaObjective | CompanyObjective
   companyObjectives?: CompanyObjective[]
+  areaKRs?: AreaKROption[]
   areaId?: string
   initialTitle?: string
   onSuccess: () => void
@@ -33,6 +35,7 @@ export default function ObjectiveDialog({
   type,
   existing,
   companyObjectives,
+  areaKRs,
   areaId,
   initialTitle,
   onSuccess,
@@ -105,11 +108,64 @@ export default function ObjectiveDialog({
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-7">
 
-          {/* Step 1: Align to area objective (team only) / company objective (area) */}
-          {(type === 'area' || type === 'team') && companyObjectives && companyObjectives.length > 0 && (
+          {/* Align to area KR (team) or company objective (area) */}
+          {type === 'team' && areaKRs && areaKRs.length > 0 && (
             <div className="space-y-3">
               <Label className="text-sm font-semibold text-white/70 tracking-wide uppercase text-xs">
-                Which {type === 'team' ? 'area' : 'company'} objective does this support?
+                Which area key result does this support?
+              </Label>
+              <div className="space-y-4">
+                {/* Group KRs by parent objective */}
+                {Object.entries(
+                  areaKRs.reduce<Record<string, AreaKROption[]>>((acc, kr) => {
+                    if (!acc[kr.objectiveTitle]) acc[kr.objectiveTitle] = []
+                    acc[kr.objectiveTitle].push(kr)
+                    return acc
+                  }, {})
+                ).map(([objTitle, krs]) => (
+                  <div key={objTitle} className="space-y-2">
+                    <p className="text-xs text-white/35 font-medium px-1">{objTitle}</p>
+                    {krs.map(kr => {
+                      const selected = alignedTo === kr.id
+                      return (
+                        <button
+                          key={kr.id}
+                          type="button"
+                          onClick={() => setAlignedTo(selected ? null : kr.id)}
+                          className={cn(
+                            'w-full text-left flex items-start gap-4 px-4 py-3 rounded-xl border-2 transition-all',
+                            selected
+                              ? 'border-[#FF5A70] bg-[#FF5A70]/10 text-white'
+                              : 'border-white/10 bg-white/5 text-white/60 hover:border-white/25 hover:bg-white/8 hover:text-white/80'
+                          )}
+                        >
+                          <span className="mt-0.5 shrink-0">
+                            {selected
+                              ? <CheckCircle2 size={18} className="text-[#FF5A70]" />
+                              : <Circle size={18} className="text-white/25" />
+                            }
+                          </span>
+                          <span className="text-sm leading-relaxed">{kr.description}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                ))}
+                {alignedTo && (
+                  <button type="button" onClick={() => setAlignedTo(null)}
+                    className="text-xs text-white/40 hover:text-white/60 underline pl-1">
+                    Clear alignment
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Align to company objective (area type) */}
+          {type === 'area' && companyObjectives && companyObjectives.length > 0 && (
+            <div className="space-y-3">
+              <Label className="text-sm font-semibold text-white/70 tracking-wide uppercase text-xs">
+                Which company objective does this support?
               </Label>
               <div className="space-y-2.5">
                 {companyObjectives.map((co) => {
@@ -137,11 +193,8 @@ export default function ObjectiveDialog({
                   )
                 })}
                 {alignedTo && (
-                  <button
-                    type="button"
-                    onClick={() => setAlignedTo(null)}
-                    className="text-xs text-white/40 hover:text-white/60 underline pl-1"
-                  >
+                  <button type="button" onClick={() => setAlignedTo(null)}
+                    className="text-xs text-white/40 hover:text-white/60 underline pl-1">
                     Clear alignment
                   </button>
                 )}

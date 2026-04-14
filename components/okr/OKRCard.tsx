@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { AreaObjective, CompanyObjective, AreaKeyResult, CompanyKeyResult, calcProgress, Profile } from '@/types'
+import { type AreaKROption } from '@/components/executive/MyTeamClient'
 import KeyResultRow from './KeyResultRow'
 import { PlusCircle, Pencil, Trash2 } from 'lucide-react'
 import KRDialog from './KRDialog'
@@ -16,6 +17,7 @@ interface OKRCardProps {
   type: 'area' | 'company' | 'team'
   profile: Profile
   companyObjectives?: CompanyObjective[]
+  areaKRs?: AreaKROption[]
   onRefresh: () => void
   isCurrentQuarter?: boolean
 }
@@ -24,7 +26,7 @@ function isAreaObjective(obj: AreaObjective | CompanyObjective): obj is AreaObje
   return 'area_id' in obj
 }
 
-export default function OKRCard({ objective, type, profile, companyObjectives, onRefresh, isCurrentQuarter = true }: OKRCardProps) {
+export default function OKRCard({ objective, type, profile, companyObjectives, areaKRs, onRefresh, isCurrentQuarter = true }: OKRCardProps) {
   const supabase = createClient()
   const [showKRDialog, setShowKRDialog] = useState(false)
   const [showObjDialog, setShowObjDialog] = useState(false)
@@ -58,6 +60,10 @@ export default function OKRCard({ objective, type, profile, companyObjectives, o
   const alignedObj = isAreaObjective(objective) && objective.aligned_objective
     ? objective.aligned_objective
     : null
+  // For team objectives, aligned_objective is a KR (has description, not title)
+  const alignedLabel = alignedObj
+    ? ((alignedObj as { description?: string }).description ?? (alignedObj as { title?: string }).title ?? '')
+    : null
 
   return (
     <Card className="w-full bg-[#140e2e] border-white/8">
@@ -68,9 +74,9 @@ export default function OKRCard({ objective, type, profile, companyObjectives, o
               <Badge variant="outline" className="text-xs border-white/15 text-white/60">
                 {totalProgress}% complete
               </Badge>
-              {alignedObj && (
+              {alignedLabel && (
                 <Badge variant="secondary" className="text-xs max-w-xs truncate bg-white/8 text-white/70">
-                  Aligned: {alignedObj.title}
+                  ↑ {alignedLabel}
                 </Badge>
               )}
             </div>
@@ -138,6 +144,7 @@ export default function OKRCard({ objective, type, profile, companyObjectives, o
         type={type}
         existing={objective}
         companyObjectives={companyObjectives}
+        areaKRs={areaKRs}
         areaId={isAreaObjective(objective) ? objective.area_id : undefined}
         onSuccess={onRefresh}
       />

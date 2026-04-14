@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
       .from('team_objectives')
       .select(`
         title, aligned_to,
-        aligned_objective:area_objectives(title),
+        aligned_objective:area_key_results(description),
         key_results:team_key_results(
           id, description, target_value, current_value, unit,
           updates:team_kr_updates(confidence_score, update_text, week_date, created_at)
@@ -54,9 +54,9 @@ export async function POST(req: NextRequest) {
 
     // Build summary for Claude
     const objSummaries = (objectives ?? []).map(obj => {
-      const alignedTitle = (obj.aligned_objective as { title?: string } | null)?.title
+      const alignedTitle = (obj.aligned_objective as { description?: string } | null)?.description
       const header = alignedTitle
-        ? `Objective: "${obj.title}" (aligned to area OKR: "${alignedTitle}")`
+        ? `Objective: "${obj.title}" (supports area KR: "${alignedTitle}")`
         : `Objective: "${obj.title}"`
 
       const krs = (obj.key_results as {

@@ -50,7 +50,7 @@ export default async function TeamPage({
     .from('team_objectives')
     .select(`
       id, title, aligned_to, created_at,
-      aligned_objective:area_objectives(id, title),
+      aligned_objective:area_key_results(id, description),
       key_results:team_key_results(
         id, description, target_value, current_value, unit,
         updates:team_kr_updates(
@@ -64,13 +64,22 @@ export default async function TeamPage({
     .eq('year', year)
     .order('created_at')
 
-  // Fetch this area's objectives as alignment options
-  const { data: areaObjectives } = await supabase
+  // Fetch this area's objectives + their KRs as alignment options
+  const { data: areaObjectivesWithKRs } = await supabase
     .from('area_objectives')
-    .select('id, title')
+    .select('id, title, key_results:area_key_results(id, description)')
     .eq('area_id', areaId)
     .eq('quarter', quarter)
     .eq('year', year)
+
+  // Flatten into { id, description, objectiveTitle }[]
+  const areaKRs = (areaObjectivesWithKRs ?? []).flatMap(obj =>
+    ((obj.key_results ?? []) as { id: string; description: string }[]).map(kr => ({
+      id: kr.id,
+      description: kr.description,
+      objectiveTitle: obj.title,
+    }))
+  )
 
   return (
     <div className="p-8 max-w-5xl mx-auto space-y-8 print:p-0 print:max-w-none">
@@ -101,7 +110,7 @@ export default async function TeamPage({
 
       <MyTeamClient
         objectives={(objectives ?? []) as unknown as Parameters<typeof MyTeamClient>[0]['objectives']}
-        companyObjectives={(areaObjectives ?? []) as unknown as Parameters<typeof MyTeamClient>[0]['companyObjectives']}
+        areaKRs={areaKRs}
         quarter={quarter}
         year={year}
         isAdmin={isAdmin}
