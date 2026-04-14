@@ -97,7 +97,7 @@ export default function ObjectiveDialog({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[720px] w-full bg-[#1c1540] border-white/10 px-8 py-7">
+      <DialogContent className="sm:max-w-[760px] w-full bg-[#1c1540] border-white/10 px-8 py-7 max-h-[90vh] overflow-y-auto">
         <DialogHeader className="mb-6">
           <DialogTitle className="text-white text-xl">{existing ? 'Edit Objective' : 'Add Objective'}</DialogTitle>
           {(type === 'area' || type === 'team') && !existing && (
@@ -114,7 +114,7 @@ export default function ObjectiveDialog({
               <Label className="text-sm font-semibold text-white/70 tracking-wide uppercase text-xs">
                 Which area key result does this support?
               </Label>
-              <div className="space-y-4">
+              <div className="space-y-4 max-h-[40vh] overflow-y-auto pr-1">
                 {/* Group KRs by parent objective */}
                 {Object.entries(
                   areaKRs.reduce<Record<string, AreaKROption[]>>((acc, kr) => {
