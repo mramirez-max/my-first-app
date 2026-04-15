@@ -147,9 +147,8 @@ export default function AIUpdateModal({
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setError('Not authenticated'); setStep('preview'); return }
 
-    const weekDate = new Date()
-    weekDate.setDate(weekDate.getDate() - weekDate.getDay() + 1)
-    const week_date = weekDate.toISOString().split('T')[0]
+    const today = new Date()
+    const week_date = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
 
     try {
       for (const update of updates.filter(u => !excluded.has(u.keyResultId))) {
