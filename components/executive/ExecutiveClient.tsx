@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Area } from '@/types'
 import { ComputedInsight, AreaInsightData } from '@/components/admin/InsightsPanel'
@@ -11,6 +11,7 @@ import ReactMarkdown from 'react-markdown'
 import { marked } from 'marked'
 import DocumentsTab, { type CompanyDocument } from './DocumentsTab'
 import WrapUpTab, { type WrapUpObjective } from './WrapUpTab'
+import { buildTerminologyRules, GlossaryEntry } from '@/config/ontop-glossary'
 
 interface KRDetail {
   description: string
@@ -91,6 +92,7 @@ function buildSystemContext(
   metricsContext: string,
   documents: CompanyDocument[],
   decisionLogs: DecisionLog[],
+  glossaryEntries: GlossaryEntry[],
 ): string {
   const flagged = insights.length > 0
     ? insights.map(i => `- [${i.type.toUpperCase()}] ${i.area}: ${i.message}`).join('\n')
@@ -177,7 +179,9 @@ ${flagged}
 ## OKR Snapshot — Q${quarter} ${year}
 ${areasDetail}
 
-When asked about a specific area, reference its KRs and updates directly.`
+When asked about a specific area, reference its KRs and updates directly.
+
+${buildTerminologyRules(glossaryEntries)}`
 }
 
 function formatDate(iso: string): string {
@@ -206,6 +210,7 @@ export default function ExecutiveClient({
 }: ExecutiveClientProps) {
   const [activeTab, setActiveTab] = useState<'chat' | 'insights' | 'documents' | 'wrapup'>('chat')
   const [documents, setDocuments] = useState<CompanyDocument[]>(initialDocuments)
+  const [glossaryEntries, setGlossaryEntries] = useState<GlossaryEntry[]>([])
 
   const [sending, setSending]     = useState(false)
   const [sent, setSent]           = useState(false)
@@ -230,6 +235,14 @@ export default function ExecutiveClient({
       const saved = localStorage.getItem(CHAT_CURRENT_KEY)
       if (saved) setChatMessages(JSON.parse(saved))
     } catch {}
+  }, [])
+
+  // Fetch live glossary for terminology enforcement
+  useEffect(() => {
+    fetch('/api/glossary')
+      .then(r => r.json())
+      .then(j => { if (j.data) setGlossaryEntries(j.data) })
+      .catch(() => {})
   }, [])
 
   // Auto-save current session whenever messages change (skip first render)
@@ -409,7 +422,7 @@ export default function ExecutiveClient({
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({
           messages:      newMessages,
-          systemContext: buildSystemContext(insights, areasPayload, quarter, year, metricsContext, documents, decisionLogs),
+          systemContext: buildSystemContext(insights, areasPayload, quarter, year, metricsContext, documents, decisionLogs, glossaryEntries),
         }),
       })
 

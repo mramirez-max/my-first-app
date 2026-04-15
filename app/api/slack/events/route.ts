@@ -5,6 +5,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentQuarter } from '@/types'
 import { getTodayMeetingTitles, getAreasForMeetings } from '@/lib/google-calendar'
 import { METRIC_DEFINITIONS, formatMetricValue } from '@/lib/metrics'
+import { getNotionMeetingNotes } from '@/lib/notion'
+import { buildTerminologyRules } from '@/config/ontop-glossary'
 
 // --- Deduplication (in-memory, sufficient for serverless retries) -------------
 const processedEvents = new Set<string>()
@@ -146,6 +148,12 @@ async function buildOKRContext(): Promise<string> {
   const supabase          = createAdminClient()
   const { quarter, year } = getCurrentQuarter()
 
+  // Fetch live glossary for terminology rules
+  const { data: glossaryEntries } = await supabase
+    .from('glossary_entries')
+    .select('*')
+    .order('category')
+
   // Previous quarter (for retroactive updates and quarter-close context)
   const prevQ = quarter === 1 ? 4 : quarter - 1
   const prevY = quarter === 1 ? year - 1 : year
@@ -165,6 +173,7 @@ async function buildOKRContext(): Promise<string> {
     { data: metricsRaw },
     { data: documents },
     { data: decisionLogs },
+    notionNotes,
   ] = await Promise.all([
     supabase.from('areas').select('id, name').order('name'),
     supabase.from('company_objectives').select('title').eq('quarter', quarter).eq('year', year),
@@ -194,6 +203,7 @@ async function buildOKRContext(): Promise<string> {
       .or(`and(quarter.eq.${quarter},year.eq.${year}),and(quarter.eq.${prevQ},year.eq.${prevY})`)
       .order('created_at', { ascending: false })
       .limit(50),
+    getNotionMeetingNotes(),
   ])
 
   type KRRow     = { description: string; updates: { confidence_score: number; update_text: string; created_at: string }[] }
@@ -331,8 +341,12 @@ async function buildOKRContext(): Promise<string> {
     ? prevQDetail
     : Object.entries(prevQDetail).map(([name, krs]) => `*${name}*\n${krs.join('\n\n')}`).join('\n\n')
 
+  const notionSection = notionNotes
+    ? `Notion Meeting Notes (live):\n${notionNotes}`
+    : 'Notion Meeting Notes: (not configured or no pages found)'
+
   return `You are the AI Chief of Staff for Ontop. Blunt, direct, no fluff.
-You have access to OKR data, live business metrics, and strategic documents (board decks, investor updates). Use all of them when relevant.
+You have access to OKR data, live business metrics, strategic documents, and live Notion meeting notes. Use all of them when relevant.
 
 DATA HIERARCHY — always follow this when sources conflict:
 1. *Business Metrics* (labeled by month/year) — ground truth for all KPIs. Always use these for specific numbers.
@@ -356,6 +370,8 @@ ${logsSection}
 Strategic Documents & Meeting Notes:
 ${docsSection}
 
+${notionSection}
+
 Q${quarter} ${year} OKR DATA:
 
 Company Objectives:
@@ -374,7 +390,9 @@ ${areaDetail}
 
 ---
 Q${prevQ} ${prevY} OKR DATA (previous quarter — includes any retroactive updates):
-${prevQSection}`
+${prevQSection}
+
+${buildTerminologyRules(glossaryEntries ?? [])}`
 }
 
 // --- Route handler -----------------------------------------------------------

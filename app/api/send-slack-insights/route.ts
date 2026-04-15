@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentQuarter } from '@/types'
 import { getTodayMeetingTitles, getMatchedMeetings, MatchedMeeting } from '@/lib/google-calendar'
 import { GroupedMeeting } from '@/config/meeting-area-map'
+import { scanForDeprecatedTerms, TermAlert } from '@/config/ontop-glossary'
 
 export const maxDuration = 60
 
@@ -50,6 +51,21 @@ function buildAreaDataText(areaInsights: AreaInsight[]): string {
     }).join('\n')
     return `Area: ${a.area}\n${krLines || '  (no key results)'}`
   }).join('\n\n')
+}
+
+// --- Terminology alerts builder ---
+
+function buildTerminologyAlertsSection(alerts: TermAlert[]): string {
+  if (alerts.length === 0) return ''
+  const lines = alerts.map(a => {
+    const badge =
+      a.status === 'sunsetting'    ? '🚨 SUNSETTING — escalate to account team' :
+      a.status === 'deprecated'    ? '🚫 DEPRECATED — remove from all communications' :
+      a.status === 'internal_only' ? '🔒 INTERNAL ONLY — never use externally' :
+                                     `correct term: *${a.preferred}*`
+    return `• *${a.area}* used "${a.deprecatedTerm}" → ${badge}\n  _"${a.excerpt}"_`
+  }).join('\n')
+  return `*Terminology Alerts* ⚠️\n${lines}`
 }
 
 // --- Prompt builders ---
@@ -201,10 +217,15 @@ export async function POST(request: NextRequest) {
     }
 
     if (calendarError) {
+      await postToSlack(`⚠️ Daily brief skipped — Google Calendar unavailable.\n_Error: ${calendarError}_`).catch(() => {})
       return NextResponse.json({ ok: true, skipped: true, reason: 'Calendar unavailable', calendarError })
     }
 
     if (todayAreas.length === 0) {
+      const dateLabel = new Date().toLocaleDateString('en-US', {
+        weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/Bogota',
+      })
+      await postToSlack(`_${dateLabel} — no leadership meetings detected, brief skipped._`).catch(() => {})
       return NextResponse.json({ ok: true, skipped: true, reason: 'No leadership meetings today' })
     }
 
@@ -212,13 +233,14 @@ export async function POST(request: NextRequest) {
     const supabase = createAdminClient()
     const { quarter, year } = getCurrentQuarter()
 
-    const [{ data: areas }, { data: areaObjectives }] = await Promise.all([
+    const [{ data: areas }, { data: areaObjectives }, { data: glossaryEntries }] = await Promise.all([
       supabase.from('areas').select('id, name').order('name'),
       supabase
         .from('area_objectives')
         .select('area_id, area:areas(name), key_results:area_key_results(description, updates:area_kr_updates(confidence_score, update_text, created_at))')
         .eq('quarter', quarter)
         .eq('year', year),
+      supabase.from('glossary_entries').select('*').order('category'),
     ])
 
     type KRRow = { description: string; updates: { confidence_score: number; update_text: string; created_at: string }[] }
@@ -261,6 +283,13 @@ export async function POST(request: NextRequest) {
         areaInsights.push({ area: name, hasOKRs: false, keyResults: [] })
       }
     }
+
+    // Step 3b: Scan OKR updates for deprecated Ontop terminology
+    const allAlerts: TermAlert[] = areaInsights.flatMap(a =>
+      a.keyResults.flatMap(kr =>
+        kr.latestUpdate ? scanForDeprecatedTerms(a.area, kr.latestUpdate, glossaryEntries ?? []) : []
+      )
+    )
 
     // Step 4: Build meeting-aware prompt and call Claude
     const today = new Date().toLocaleDateString('en-US', {
@@ -305,6 +334,10 @@ export async function POST(request: NextRequest) {
     if (detail) {
       const parentTs = await postToSlack(`*${dateLabel} / OKR Execution Brief* 🧵👇🏼\n${meetingLabel}\n\n${summary}`)
       await postToSlack(detail, parentTs)
+      const alertsSection = buildTerminologyAlertsSection(allAlerts)
+      if (alertsSection) {
+        await postToSlack(alertsSection, parentTs)
+      }
     } else {
       await postToSlack(`${meetingLabel}\n\n${summary || raw}`)
     }

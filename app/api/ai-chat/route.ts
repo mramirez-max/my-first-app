@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { getNotionMeetingNotes } from '@/lib/notion'
 
 const client = new Anthropic({ maxRetries: 5 })
 
@@ -9,10 +10,16 @@ export async function POST(request: NextRequest) {
     systemContext: string
   }
 
+  // Fetch live Notion meeting notes and append to context (5-min cache)
+  const notionNotes = await getNotionMeetingNotes()
+  const fullContext = notionNotes
+    ? `${systemContext}\n\nNotion Meeting Notes (live, fetched now):\n${notionNotes}`
+    : systemContext
+
   const stream = client.messages.stream({
     model: 'claude-sonnet-4-6',
     max_tokens: 2048,
-    system: systemContext,
+    system: fullContext,
     messages,
   })
 

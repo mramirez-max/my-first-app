@@ -26,7 +26,9 @@ import SeedCompanyOKRsButton from './SeedCompanyOKRsButton'
 import BulkImportModal from '@/components/admin/BulkImportModal'
 import InviteUserModal from '@/components/admin/InviteUserModal'
 import OKRManager from '@/components/admin/OKRManager'
+import GlossaryManager from '@/components/admin/GlossaryManager'
 import { Upload, UserPlus } from 'lucide-react'
+import { GlossaryEntry } from '@/config/ontop-glossary'
 
 interface AdminClientProps {
   profiles: (Profile & { area?: { name: string }; email?: string })[]
@@ -35,6 +37,7 @@ interface AdminClientProps {
   quarter: number
   year: number
   initialObjectives: React.ComponentProps<typeof OKRManager>['initialObjectives']
+  initialGlossary: GlossaryEntry[]
 }
 
 const ROLE_LABELS: Record<Role, string> = {
@@ -49,7 +52,7 @@ const ROLE_BADGE: Record<Role, 'default' | 'secondary' | 'outline'> = {
   team_member: 'outline',
 }
 
-export default function AdminClient({ profiles, areas, companyObjectives, quarter, year, initialObjectives }: AdminClientProps) {
+export default function AdminClient({ profiles, areas, companyObjectives, quarter, year, initialObjectives, initialGlossary }: AdminClientProps) {
   const supabase = createClient()
   const router = useRouter()
   const [saving, setSaving] = useState<string | null>(null)
@@ -217,6 +220,8 @@ export default function AdminClient({ profiles, areas, companyObjectives, quarte
         quarter={quarter}
         year={year}
       />
+
+      <GlossaryManager initialEntries={initialGlossary} />
 
     </div>
   )

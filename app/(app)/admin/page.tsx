@@ -28,6 +28,7 @@ export default async function AdminPage() {
     { data: companyObjectives },
     { data: { users } },
     { data: areaObjectives },
+    { data: glossaryEntries },
   ] = await Promise.all([
     supabase.from('profiles').select('*, area:areas(name)').order('full_name'),
     supabase.from('areas').select('*').order('name'),
@@ -43,6 +44,7 @@ export default async function AdminPage() {
       .select('id, title, area_id, aligned_to, area:areas(name), key_results:area_key_results(id, description, target_value, unit, owner_id, updates:area_kr_updates(confidence_score, update_text, created_at))')
       .eq('quarter', quarter)
       .eq('year', year),
+    admin.from('glossary_entries').select('*').order('category').order('created_at'),
   ])
 
   // Merge emails into profiles
@@ -148,6 +150,7 @@ export default async function AdminPage() {
         quarter={quarter}
         year={year}
         initialObjectives={initialObjectives}
+        initialGlossary={glossaryEntries ?? []}
       />
     </div>
   )

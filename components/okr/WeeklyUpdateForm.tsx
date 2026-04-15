@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Sheet,
   SheetContent,
@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { createClient } from '@/lib/supabase/client'
 import { AreaKRUpdate, CompanyKRUpdate } from '@/types'
+import { scanForDeprecatedTerms, TermAlert, GlossaryEntry } from '@/config/ontop-glossary'
 
 interface WeeklyUpdateFormProps {
   open: boolean
@@ -40,6 +41,15 @@ export default function WeeklyUpdateForm({
   const [value, setValue] = useState<string>(String(existing?.current_value ?? currentValue))
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [terminologyAlerts, setTerminologyAlerts] = useState<TermAlert[]>([])
+  const [glossaryEntries, setGlossaryEntries]     = useState<GlossaryEntry[]>([])
+
+  useEffect(() => {
+    fetch('/api/glossary')
+      .then(r => r.json())
+      .then(j => { if (j.data) setGlossaryEntries(j.data) })
+      .catch(() => {})
+  }, [])
 
   const isEditing = !!existing
   const table = type === 'area' ? 'area_kr_updates' : type === 'team' ? 'team_kr_updates' : 'company_kr_updates'
@@ -51,8 +61,7 @@ export default function WeeklyUpdateForm({
     setValue(String(existing?.current_value ?? currentValue))
   })
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+  async function doSave() {
     setLoading(true)
     setError(null)
 
@@ -106,11 +115,30 @@ export default function WeeklyUpdateForm({
         .eq('id', keyResultId)
     }
 
+    setTerminologyAlerts([])
     setUpdateText('')
     setConfidence(3)
     setLoading(false)
     onSuccess()
     onClose()
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+
+    // If warning already showing, treat re-submit as "submit anyway"
+    if (terminologyAlerts.length > 0) {
+      await doSave()
+      return
+    }
+
+    const alerts = scanForDeprecatedTerms('', updateText, glossaryEntries)
+    if (alerts.length > 0) {
+      setTerminologyAlerts(alerts)
+      return
+    }
+
+    await doSave()
   }
 
   return (
@@ -180,6 +208,33 @@ export default function WeeklyUpdateForm({
             <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 p-2 rounded">{error}</p>
           )}
 
+          {terminologyAlerts.length > 0 && (
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 space-y-2">
+              <p className="text-sm font-medium text-amber-400">⚠️ Terminology — please review before submitting:</p>
+              <ul className="space-y-1">
+                {terminologyAlerts.map((a, i) => (
+                  <li key={i} className="text-xs text-amber-300/80">
+                    {a.status === 'sunsetting'    ? '🚨' :
+                     a.status === 'deprecated'    ? '🚫' :
+                     a.status === 'internal_only' ? '🔒' : '→'}{' '}
+                    <span className="font-medium">"{a.deprecatedTerm}"</span>
+                    {a.preferred
+                      ? <> → use <span className="font-medium">"{a.preferred}"</span></>
+                      : ' — do not use'}
+                    {a.status === 'sunsetting' && ' (escalate to account team)'}
+                  </li>
+                ))}
+              </ul>
+              <button
+                type="button"
+                onClick={() => setTerminologyAlerts([])}
+                className="text-xs text-amber-400/60 hover:text-amber-400 underline"
+              >
+                Edit text
+              </button>
+            </div>
+          )}
+
           <div className="flex gap-2 pt-2">
             <Button
               type="button"
@@ -194,7 +249,7 @@ export default function WeeklyUpdateForm({
               disabled={loading}
               className="flex-1 bg-[#FF5A70] hover:bg-[#ff3f58] text-white"
             >
-              {loading ? 'Saving...' : isEditing ? 'Save Changes' : 'Submit Update'}
+              {loading ? 'Saving...' : terminologyAlerts.length > 0 ? 'Submit anyway' : isEditing ? 'Save Changes' : 'Submit Update'}
             </Button>
           </div>
         </form>
