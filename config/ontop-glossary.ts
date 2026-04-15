@@ -322,7 +322,7 @@ export function buildTerminologyRules(entries: GlossaryEntry[]): string {
   ].filter(Boolean).join('\n')
 
   return `ONTOP TERMINOLOGY RULES:
-Always use Ontop's preferred terminology. If a deprecated term appears in context, silently substitute the correct one in your response. Never use these terms in any client or worker-facing output.
+Always use Ontop's preferred terminology. If a deprecated term appears in the question or context, start your response with a brief correction — e.g. "Quick note: we call this [correct term], not [deprecated term]." — then answer using only the correct term. Never use deprecated terms in your response.
 
 ${neverUseLines}
 
