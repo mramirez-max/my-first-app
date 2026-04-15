@@ -66,9 +66,12 @@ export default function UpdateFeed({ keyResultId, type, refreshKey, canEdit, cur
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-medium text-white/70">
-                    Week of {new Date(update.week_date).toLocaleDateString('en-US', {
-                      month: 'short', day: 'numeric', year: 'numeric'
-                    })}
+                    Week of {(() => {
+                      const [y, m, d] = update.week_date.split('-').map(Number)
+                      return new Date(y, m - 1, d).toLocaleDateString('en-US', {
+                        month: 'short', day: 'numeric', year: 'numeric'
+                      })
+                    })()}
                   </span>
                   <span className="text-xs text-white/30">·</span>
                   <span className="text-xs text-white/50">

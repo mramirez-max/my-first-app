@@ -40,6 +40,7 @@ export default function KeyResultRow({
   const [showForm, setShowForm] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
   const [deleting, setDeleting] = useState(false)
+  const [localCurrentValue, setLocalCurrentValue] = useState(keyResult.current_value)
 
   async function handleDelete() {
     if (!confirm('Delete this key result and all its updates? This cannot be undone.')) return
@@ -50,7 +51,7 @@ export default function KeyResultRow({
     onDeleted?.()
   }
 
-  const progress = calcProgress(keyResult.current_value, keyResult.target_value)
+  const progress = calcProgress(localCurrentValue, keyResult.target_value)
   const latestConfidence = keyResult.updates?.[0]?.confidence_score ?? null
 
   return (
@@ -60,7 +61,7 @@ export default function KeyResultRow({
           <p className="text-sm font-medium text-white/80">{keyResult.description}</p>
           <div className="flex items-center gap-2 mt-1">
             <span className="text-xs text-white/40">
-              {keyResult.current_value.toLocaleString()}
+              {localCurrentValue.toLocaleString()}
               {keyResult.unit ? ` ${keyResult.unit}` : ''} /{' '}
               {keyResult.target_value.toLocaleString()}
               {keyResult.unit ? ` ${keyResult.unit}` : ''}
@@ -135,9 +136,12 @@ export default function KeyResultRow({
         keyResultId={keyResult.id}
         type={type}
         currentValue={keyResult.current_value}
-        onSuccess={() => {
+        onSuccess={async () => {
           setRefreshKey(k => k + 1)
           setShowUpdates(true)
+          const krTable = type === 'area' ? 'area_key_results' : type === 'team' ? 'team_key_results' : 'company_key_results'
+          const { data } = await supabase.from(krTable).select('current_value').eq('id', keyResult.id).single()
+          if (data) setLocalCurrentValue(data.current_value)
         }}
       />
     </div>

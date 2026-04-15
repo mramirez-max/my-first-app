@@ -88,9 +88,11 @@ export default function WeeklyUpdateForm({
         return
       }
 
-      const weekDate = new Date()
-      weekDate.setDate(weekDate.getDate() - weekDate.getDay() + 1)
-      const week_date = weekDate.toISOString().split('T')[0]
+      const today = new Date()
+      const dow = today.getDay() // 0 = Sunday
+      const weekDate = new Date(today)
+      weekDate.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1))
+      const week_date = `${weekDate.getFullYear()}-${String(weekDate.getMonth() + 1).padStart(2, '0')}-${String(weekDate.getDate()).padStart(2, '0')}`
 
       const { error: insertError } = await supabase.from(table).insert({
         key_result_id: keyResultId,
