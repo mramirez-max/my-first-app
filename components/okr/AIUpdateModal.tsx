@@ -29,6 +29,7 @@ interface AIUpdateModalProps {
   objectives: AreaObjective[]
   companyObjectives: Pick<CompanyObjective, 'id' | 'title'>[]
   onSuccess: () => void
+  type?: 'area' | 'team'
 }
 
 type Step = 'upload' | 'generating' | 'preview' | 'saving'
@@ -49,6 +50,7 @@ export default function AIUpdateModal({
   objectives,
   companyObjectives,
   onSuccess,
+  type = 'area',
 }: AIUpdateModalProps) {
   const supabase = createClient()
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -150,10 +152,12 @@ export default function AIUpdateModal({
     const today = new Date()
     const week_date = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
 
+    const updatesTable = type === 'team' ? 'team_kr_updates' : 'area_kr_updates'
+    const krsTable = type === 'team' ? 'team_key_results' : 'area_key_results'
+
     try {
       for (const update of updates.filter(u => !excluded.has(u.keyResultId))) {
-        // Insert weekly update
-        await supabase.from('area_kr_updates').insert({
+        await supabase.from(updatesTable).insert({
           key_result_id: update.keyResultId,
           update_text: update.updateText,
           confidence_score: update.confidenceScore,
@@ -162,9 +166,8 @@ export default function AIUpdateModal({
           week_date,
         })
 
-        // Update the KR's current value
         await supabase
-          .from('area_key_results')
+          .from(krsTable)
           .update({ current_value: update.currentValue })
           .eq('id', update.keyResultId)
       }
@@ -546,7 +549,7 @@ export default function AIUpdateModal({
       <ObjectiveDialog
         open={createOKRTopic !== null}
         onClose={() => setCreateOKRTopic(null)}
-        type="area"
+        type={type === 'team' ? 'team' : 'area'}
         areaId={areaId}
         companyObjectives={companyObjectives as CompanyObjective[]}
         initialTitle={createOKRTopic?.title ?? ''}

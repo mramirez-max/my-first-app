@@ -7,6 +7,7 @@ import ReactMarkdown from 'react-markdown'
 import OKRCard from '@/components/okr/OKRCard'
 import ObjectiveDialog from '@/components/okr/ObjectiveDialog'
 import AISetupModal from '@/components/okr/AISetupModal'
+import AIUpdateModal from '@/components/okr/AIUpdateModal'
 import TeamMetricsSection from '@/components/executive/TeamMetricsSection'
 import { useRouter } from 'next/navigation'
 
@@ -238,6 +239,7 @@ export default function MyTeamClient({ objectives, areaKRs, quarter, year, isAdm
   const [error, setError] = useState<string | null>(null)
   const [showObjectiveDialog, setShowObjectiveDialog] = useState(false)
   const [showAISetup, setShowAISetup] = useState(false)
+  const [showAIUpdate, setShowAIUpdate] = useState(false)
   const router = useRouter()
 
   const weeks = useMemo(() => getLastNWeeks(6), [])
@@ -404,6 +406,13 @@ export default function MyTeamClient({ objectives, areaKRs, quarter, year, isAdm
           <div className="flex items-center justify-end print:hidden">
             <div className="flex items-center gap-2">
               <button
+                onClick={() => setShowAIUpdate(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-[#FF5A70]/40 text-[#FF5A70]/80 hover:bg-[#FF5A70]/10 transition-colors"
+              >
+                <Sparkles size={12} />
+                AI Weekly Update
+              </button>
+              <button
                 onClick={() => setShowAISetup(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-gradient-to-br from-[#FF5A70] to-[#4A268C] text-white hover:opacity-90 transition-opacity"
               >
@@ -465,6 +474,17 @@ export default function MyTeamClient({ objectives, areaKRs, quarter, year, isAdm
             areaKRs={areaKRs}
             quarter={quarter}
             year={year}
+            onSuccess={handleRefresh}
+          />
+
+          <AIUpdateModal
+            open={showAIUpdate}
+            onClose={() => setShowAIUpdate(false)}
+            type="team"
+            areaId={areaId}
+            areaName={areaName}
+            objectives={objectives}
+            companyObjectives={[]}
             onSuccess={handleRefresh}
           />
         </div>
