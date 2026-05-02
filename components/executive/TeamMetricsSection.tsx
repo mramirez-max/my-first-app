@@ -443,14 +443,14 @@ export default function TeamMetricsSection({ areaId, canEdit }: TeamMetricsSecti
                               <div className="flex items-center justify-end gap-1">
                                 {DeltaIcon}
                                 <span
-                                  className={`${valueColor} ${isCurrentWeek && canEdit ? 'cursor-pointer hover:text-white transition-colors' : ''}`}
-                                  onClick={isCurrentWeek && canEdit ? () => setEditingCell({ metricId: metric.id, weekDate: week }) : undefined}
-                                  title={isCurrentWeek && canEdit ? 'Click to edit' : undefined}
+                                  className={`${valueColor} ${canEdit ? 'cursor-pointer hover:text-white transition-colors' : ''}`}
+                                  onClick={canEdit ? () => setEditingCell({ metricId: metric.id, weekDate: week }) : undefined}
+                                  title={canEdit ? 'Click to edit' : undefined}
                                 >
                                   {formatValue(value, metric.unit)}
                                 </span>
                               </div>
-                            ) : isCurrentWeek && canEdit ? (
+                            ) : canEdit ? (
                               <button
                                 onClick={() => setEditingCell({ metricId: metric.id, weekDate: week })}
                                 className="flex items-center justify-end gap-1 w-full text-white/20 hover:text-white/50 transition-colors group/cell"

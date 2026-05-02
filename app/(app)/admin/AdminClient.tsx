@@ -27,7 +27,7 @@ import BulkImportModal from '@/components/admin/BulkImportModal'
 import InviteUserModal from '@/components/admin/InviteUserModal'
 import OKRManager from '@/components/admin/OKRManager'
 import GlossaryManager from '@/components/admin/GlossaryManager'
-import { Upload, UserPlus } from 'lucide-react'
+import { Upload, UserPlus, Trash2 } from 'lucide-react'
 import { GlossaryEntry } from '@/config/ontop-glossary'
 
 interface AdminClientProps {
@@ -60,6 +60,8 @@ export default function AdminClient({ profiles, areas, companyObjectives, quarte
   const [showInvite, setShowInvite] = useState(false)
   const [editingName, setEditingName] = useState<string | null>(null)
   const [nameValue, setNameValue] = useState('')
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState<string | null>(null)
 
   async function updateProfile(userId: string, updates: { role?: Role; area_id?: string | null; full_name?: string }) {
     setSaving(userId)
@@ -71,6 +73,18 @@ export default function AdminClient({ profiles, areas, companyObjectives, quarte
   async function saveName(userId: string) {
     if (nameValue.trim()) await updateProfile(userId, { full_name: nameValue.trim() })
     setEditingName(null)
+  }
+
+  async function deleteUser(userId: string) {
+    setDeleting(userId)
+    await fetch('/api/admin/delete-user', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId }),
+    })
+    setDeleting(null)
+    setConfirmDelete(null)
+    router.refresh()
   }
 
   return (
@@ -185,6 +199,33 @@ export default function AdminClient({ profiles, areas, companyObjectives, quarte
 
                       {saving === p.id && (
                         <span className="text-xs text-white/40">Saving...</span>
+                      )}
+
+                      {confirmDelete === p.id ? (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs text-red-400">Delete?</span>
+                          <button
+                            onClick={() => deleteUser(p.id)}
+                            disabled={deleting === p.id}
+                            className="text-xs px-2 py-1 rounded bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+                          >
+                            {deleting === p.id ? 'Deleting…' : 'Yes'}
+                          </button>
+                          <button
+                            onClick={() => setConfirmDelete(null)}
+                            className="text-xs px-2 py-1 rounded bg-white/5 text-white/40 hover:text-white/70 transition-colors"
+                          >
+                            No
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmDelete(p.id)}
+                          className="p-1.5 rounded text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                          title="Delete user"
+                        >
+                          <Trash2 size={14} />
+                        </button>
                       )}
                     </div>
                   </TableCell>
