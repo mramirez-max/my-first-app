@@ -7,6 +7,7 @@ import ReactMarkdown from 'react-markdown'
 import OKRCard from '@/components/okr/OKRCard'
 import ObjectiveDialog from '@/components/okr/ObjectiveDialog'
 import AISetupModal from '@/components/okr/AISetupModal'
+import TeamMetricsSection from '@/components/executive/TeamMetricsSection'
 import { useRouter } from 'next/navigation'
 
 interface KRUpdate {
@@ -448,6 +449,11 @@ export default function MyTeamClient({ objectives, areaKRs, quarter, year, isAdm
           year={year}
           onSuccess={handleRefresh}
         />
+      </div>
+
+      {/* Team Metrics — week-over-week input/output tracking */}
+      <div className="print:hidden">
+        <TeamMetricsSection areaId={areaId} canEdit={canEdit} />
       </div>
 
       {/* Report section — screen */}
