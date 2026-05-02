@@ -16,6 +16,7 @@ interface TeamMetric {
   unit: string | null
   is_active: boolean
   owner_id: string | null
+  higher_is_better: boolean
   owner?: Profile | null
 }
 
@@ -78,6 +79,7 @@ function MetricDialog({ areaId, members, existing, onClose, onSuccess }: MetricD
   const [name, setName] = useState(existing?.metric_name ?? '')
   const [unit, setUnit] = useState(existing?.unit ?? '')
   const [ownerId, setOwnerId] = useState<string>(existing?.owner_id ?? '')
+  const [higherIsBetter, setHigherIsBetter] = useState(existing?.higher_is_better ?? true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const nameRef = useRef<HTMLInputElement>(null)
@@ -95,6 +97,7 @@ function MetricDialog({ areaId, members, existing, onClose, onSuccess }: MetricD
       metric_name: name.trim(),
       unit: unit.trim() || null,
       owner_id: ownerId || null,
+      higher_is_better: higherIsBetter,
     }
     const { error: err } = isEdit
       ? await supabase.from('team_metrics').update(payload).eq('id', existing!.id)
@@ -158,6 +161,25 @@ function MetricDialog({ areaId, members, existing, onClose, onSuccess }: MetricD
                 <option key={m.id} value={m.id}>{m.full_name ?? m.id}</option>
               ))}
             </select>
+          </div>
+          <div>
+            <label className="block text-xs text-white/50 mb-1.5">Direction</label>
+            <div className="flex gap-2">
+              {([true, false] as const).map(val => (
+                <button
+                  key={String(val)}
+                  type="button"
+                  onClick={() => setHigherIsBetter(val)}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                    higherIsBetter === val
+                      ? 'bg-white/10 border-white/20 text-white'
+                      : 'bg-transparent border-white/8 text-white/40 hover:text-white/60'
+                  }`}
+                >
+                  {val ? '↑ Higher is better' : '↓ Lower is better'}
+                </button>
+              ))}
+            </div>
           </div>
           {error && <p className="text-xs text-red-400">{error}</p>}
           <div className="flex gap-2 pt-1">
@@ -423,9 +445,20 @@ export default function TeamMetricsSection({ areaId, canEdit }: TeamMetricsSecti
                         let DeltaIcon = null
                         let valueColor = 'text-white/50'
                         if (delta !== null) {
-                          if (delta > 0) { DeltaIcon = <TrendingUp size={9} className="text-emerald-400" />; valueColor = 'text-emerald-400' }
-                          else if (delta < 0) { DeltaIcon = <TrendingDown size={9} className="text-red-400" />; valueColor = 'text-red-400' }
-                          else { DeltaIcon = <Minus size={9} className="text-white/25" />; valueColor = 'text-white/40' }
+                          const isGood = delta === 0 ? null : (delta > 0) === metric.higher_is_better
+                          if (delta === 0) {
+                            DeltaIcon = <Minus size={9} className="text-white/25" />; valueColor = 'text-white/40'
+                          } else if (isGood) {
+                            DeltaIcon = metric.higher_is_better
+                              ? <TrendingUp size={9} className="text-emerald-400" />
+                              : <TrendingDown size={9} className="text-emerald-400" />
+                            valueColor = 'text-emerald-400'
+                          } else {
+                            DeltaIcon = metric.higher_is_better
+                              ? <TrendingDown size={9} className="text-red-400" />
+                              : <TrendingUp size={9} className="text-red-400" />
+                            valueColor = 'text-red-400'
+                          }
                         }
 
                         return (
