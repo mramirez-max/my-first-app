@@ -260,7 +260,7 @@ export default function TeamMetricsSection({ areaId, canEdit }: TeamMetricsSecti
     const [{ data: m }, { data: prof }] = await Promise.all([
       supabase
         .from('team_metrics')
-        .select('*, owner:profiles(id, full_name)')
+        .select('*')
         .eq('area_id', areaId)
         .eq('is_active', true)
         .order('created_at'),
@@ -270,9 +270,14 @@ export default function TeamMetricsSection({ areaId, canEdit }: TeamMetricsSecti
         .eq('area_id', areaId),
     ])
 
-    const metricsData = (m ?? []) as TeamMetric[]
+    const membersData = (prof ?? []) as Profile[]
+    setMembers(membersData)
+
+    const metricsData = ((m ?? []) as TeamMetric[]).map(metric => ({
+      ...metric,
+      owner: membersData.find(p => p.id === metric.owner_id) ?? null,
+    }))
     setMetrics(metricsData)
-    setMembers((prof ?? []) as Profile[])
 
     if (metricsData.length > 0) {
       const { data: vals } = await supabase
