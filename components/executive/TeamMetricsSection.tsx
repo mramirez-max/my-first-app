@@ -101,6 +101,7 @@ function MetricDialog({ areaId, members, existing, onClose, onSuccess }: MetricD
       : await supabase.from('team_metrics').insert({
           ...payload,
           area_id: areaId,
+          metric_type: 'input',
           created_by: (await supabase.auth.getUser()).data.user?.id,
         })
     setSaving(false)
