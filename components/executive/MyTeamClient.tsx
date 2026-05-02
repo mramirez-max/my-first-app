@@ -232,6 +232,7 @@ function KRCard({ kr, weeks, currentWeek }: { kr: KeyResult; weeks: string[]; cu
 }
 
 export default function MyTeamClient({ objectives, areaKRs, quarter, year, isAdmin, profile, areaId, areaName }: MyTeamClientProps) {
+  const [view, setView] = useState<'okrs' | 'metrics'>('okrs')
   const [generating, setGenerating] = useState(false)
   const [report, setReport] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -380,81 +381,101 @@ export default function MyTeamClient({ objectives, areaKRs, quarter, year, isAdm
         ))}
       </div>
 
-      {/* OKR management + week-over-week tracking */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-white/60 uppercase tracking-wide">Team OKRs</h3>
-          <div className="flex items-center gap-2 print:hidden">
-            <button
-              onClick={() => setShowAISetup(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-gradient-to-br from-[#FF5A70] to-[#4A268C] text-white hover:opacity-90 transition-opacity"
-            >
-              <Sparkles size={12} />
-              Generate with AI
-            </button>
-            <button
-              onClick={() => setShowObjectiveDialog(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-white/15 text-white/50 hover:text-white hover:bg-white/5 transition-colors"
-            >
-              <PlusCircle size={12} />
-              Add Objective
-            </button>
+      {/* Toggle: OKRs / Metrics */}
+      <div className="flex items-center gap-1 bg-white/5 p-1 rounded-xl w-fit print:hidden">
+        {(['okrs', 'metrics'] as const).map(v => (
+          <button
+            key={v}
+            onClick={() => setView(v)}
+            className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-colors capitalize ${
+              view === v
+                ? 'bg-white/10 text-white'
+                : 'text-white/40 hover:text-white/60'
+            }`}
+          >
+            {v === 'okrs' ? 'Team OKRs' : 'Metrics'}
+          </button>
+        ))}
+      </div>
+
+      {/* OKRs view */}
+      {view === 'okrs' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-end print:hidden">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowAISetup(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-gradient-to-br from-[#FF5A70] to-[#4A268C] text-white hover:opacity-90 transition-opacity"
+              >
+                <Sparkles size={12} />
+                Generate with AI
+              </button>
+              <button
+                onClick={() => setShowObjectiveDialog(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-white/15 text-white/50 hover:text-white hover:bg-white/5 transition-colors"
+              >
+                <PlusCircle size={12} />
+                Add Objective
+              </button>
+            </div>
           </div>
+
+          {objectives.length === 0 ? (
+            <div className="rounded-xl border border-white/8 bg-gradient-to-br from-[#1c1540] to-[#23174B] p-8 text-center space-y-3">
+              <Clock size={32} className="text-white/20 mx-auto" />
+              <p className="text-white/50 text-sm">No OKRs set for {areaName} in Q{quarter} {year}.</p>
+              <button
+                onClick={() => setShowObjectiveDialog(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-br from-[#FF5A70] to-[#4A268C] text-white hover:opacity-90 transition-opacity"
+              >
+                <PlusCircle size={14} />
+                Add Objective
+              </button>
+            </div>
+          ) : (
+            objectives.map(obj => (
+              <OKRCard
+                key={obj.id}
+                objective={obj as AreaObjective}
+                type="team"
+                profile={profile}
+                areaKRs={areaKRs}
+                onRefresh={handleRefresh}
+                isCurrentQuarter={true}
+              />
+            ))
+          )}
+
+          <ObjectiveDialog
+            open={showObjectiveDialog}
+            onClose={() => setShowObjectiveDialog(false)}
+            type="team"
+            areaId={areaId}
+            areaKRs={areaKRs}
+            onSuccess={handleRefresh}
+          />
+
+          <AISetupModal
+            open={showAISetup}
+            onClose={() => setShowAISetup(false)}
+            type="team"
+            areaId={areaId}
+            areaName={areaName}
+            companyObjectives={[]}
+            areaKRs={areaKRs}
+            quarter={quarter}
+            year={year}
+            onSuccess={handleRefresh}
+          />
         </div>
+      )}
 
-        {objectives.length === 0 ? (
-          <div className="rounded-xl border border-white/8 bg-gradient-to-br from-[#1c1540] to-[#23174B] p-8 text-center space-y-3">
-            <Clock size={32} className="text-white/20 mx-auto" />
-            <p className="text-white/50 text-sm">No OKRs set for {areaName} in Q{quarter} {year}.</p>
-            <button
-              onClick={() => setShowObjectiveDialog(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-br from-[#FF5A70] to-[#4A268C] text-white hover:opacity-90 transition-opacity"
-            >
-              <PlusCircle size={14} />
-              Add Objective
-            </button>
-          </div>
-        ) : (
-          objectives.map(obj => (
-            <OKRCard
-              key={obj.id}
-              objective={obj as AreaObjective}
-              type="team"
-              profile={profile}
-              areaKRs={areaKRs}
-              onRefresh={handleRefresh}
-              isCurrentQuarter={true}
-            />
-          ))
-        )}
-
-        <ObjectiveDialog
-          open={showObjectiveDialog}
-          onClose={() => setShowObjectiveDialog(false)}
-          type="team"
-          areaId={areaId}
-          areaKRs={areaKRs}
-          onSuccess={handleRefresh}
-        />
-
-        <AISetupModal
-          open={showAISetup}
-          onClose={() => setShowAISetup(false)}
-          type="team"
-          areaId={areaId}
-          areaName={areaName}
-          companyObjectives={[]}
-          areaKRs={areaKRs}
-          quarter={quarter}
-          year={year}
-          onSuccess={handleRefresh}
-        />
-      </div>
-
-      {/* Team Metrics — week-over-week input/output tracking */}
-      <div className="print:hidden">
-        <TeamMetricsSection areaId={areaId} canEdit={canEdit} />
-      </div>
+      {/* Metrics view */}
+      {view === 'metrics' && (
+        <div className="print:hidden">
+          <TeamMetricsSection areaId={areaId} canEdit={canEdit} />
+        </div>
+      )}
 
       {/* Report section — screen */}
       <div className="rounded-xl border border-white/8 bg-gradient-to-br from-[#1c1540] to-[#23174B] overflow-hidden print:hidden">
