@@ -49,7 +49,7 @@ export default async function TeamPage({
   const { data: objectives } = await supabase
     .from('team_objectives')
     .select(`
-      id, title, aligned_to, created_at,
+      id, title, area_id, aligned_to, created_at,
       aligned_objective:area_key_results(id, description),
       key_results:team_key_results(
         id, description, target_value, current_value, unit,
