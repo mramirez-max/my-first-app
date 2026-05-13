@@ -283,8 +283,8 @@ export default function MyTeamClient({ objectives, areaKRs, quarter, year, isAdm
     }
   }
 
-  // --- Team member view (non-admin) ---
-  if (!isAdmin) {
+  // --- Team member view ---
+  if (!canEdit) {
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between">
