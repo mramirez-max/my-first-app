@@ -9,6 +9,9 @@ import { PlusCircle, ChevronDown, ChevronUp, Pencil, Trash2 } from 'lucide-react
 import UpdateFeed from './UpdateFeed'
 import WeeklyUpdateForm from './WeeklyUpdateForm'
 import { createClient } from '@/lib/supabase/client'
+import dynamic from 'next/dynamic'
+
+const KRTrendChart = dynamic(() => import('./KRTrendChart'), { ssr: false })
 
 interface KeyResultRowProps {
   keyResult: AreaKeyResult | CompanyKeyResult
@@ -114,6 +117,14 @@ export default function KeyResultRow({
         </div>
         <Progress value={progress} className="h-2" />
       </div>
+
+      {keyResult.unit && (keyResult.updates?.length ?? 0) >= 2 && (
+        <KRTrendChart
+          updates={[...(keyResult.updates ?? [])].sort((a, b) => a.week_date.localeCompare(b.week_date))}
+          targetValue={keyResult.target_value}
+          unit={keyResult.unit}
+        />
+      )}
 
       <div>
         <button
